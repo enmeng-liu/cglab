@@ -26,9 +26,58 @@ def draw_line(p_list, algorithm):
             for x in range(x0, x1 + 1):
                 result.append((x, int(y0 + k * (x - x0))))
     elif algorithm == 'DDA':
-        pass
+        dx, dy = x1 - x0, y1 - y0
+        if abs(dx) >= abs(dy):
+            # 斜率<=1
+            step = abs(dx)
+        else:
+            # 斜率>1
+            step = abs(dy)
+        dx, dy = dx / step, dy / step
+        for i in range(0, step + 1):
+            result.append((int(x0 + dx * i), int(y0 + dy * i)))
     elif algorithm == 'Bresenham':
-        pass
+        if x1 == x0:
+            result = [[x0, y] for y in range(min(y0, y1), max(y0, y1) + 1)]
+            return result
+        elif y1 == y0:
+            result = [[x ,y0] for x in range(min(x0, x1), max(x0, x1) + 1)]
+            return result
+        dx, dy = x1 - x0, y1 - y0
+        if abs(dx) >= abs(dy):
+            if x0 > x1:
+                # 直线生成方向与坐标轴相反时交换起始点
+                x0, y0, x1, y1 = x1, y1, x0, y0
+            result.append([x0, y0])
+            print('start to plot: ({},{}) -> ({},{})'.format(x0, y0, x1, y1))
+            dx, dy = x1 - x0, y1 - y0
+            p = 2 * dy - 2 * dx
+            y = y0
+            for k in range(0, dx):
+                if p < 0:
+                    result.append([x0 + k + 1, y])
+                    p += (dy * 2)
+                else:
+                    result.append([x0 + k + 1, y + 1])
+                    y = y + 1
+                    p += (dy * 2 - dx * 2)
+            print('The last point:({}, {})'.format(result[-1][0], result[-1][1]))
+        else:
+            if y0 > y1:
+                x0, y0, x1, y1 = x1, y1, x0, y0
+            result.append([x0, y0])
+            dx, dy = x1 - x0, y1 - y0
+            p = dx * 2 - dy * 2
+            x = x0
+            for k in range(0, dy):
+                if p < 0:
+                    result.append([x, y0 + k +1])
+                    p += (dx * 2)
+                else:
+                    result.append([x + 1, y0 + k + 1])
+                    x = x + 1
+                    p += (dx * 2 - dy * 2)
+
     return result
 
 

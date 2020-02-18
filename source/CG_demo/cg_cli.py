@@ -22,6 +22,8 @@ if __name__ == '__main__':
         line = fp.readline()
         while line:
             line = line.strip().split(' ')
+            if line[0][0] == '#':
+                pass #注释
             if line[0] == 'resetCanvas':
                 width = int(line[1])
                 height = int(line[2])
