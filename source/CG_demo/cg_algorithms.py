@@ -101,8 +101,46 @@ def draw_ellipse(p_list):
     :param p_list: (list of list of int: [[x0, y0], [x1, y1]]) 椭圆的矩形包围框左上角和右下角顶点坐标
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
-    pass
-
+    print('start to generate ellipse.')
+    x0, y0 = p_list[0]
+    x1, y1 = p_list[1]
+    result = []
+    quater = []
+    rx, ry = (int(abs(x1 - x0) / 2), int(abs(y1 - y0) / 2))
+    rx2, ry2 = rx * rx, ry * ry
+    xc, yc = int((x1 + x0) / 2), int((y1 + y0) / 2)
+    quater.append([0, ry])
+    p = ry2- rx2 *  ry + ry2 / 4
+    x, y, k = 0, ry, 0
+    # 区域1
+    while 2 * ry2 * x < 2 * rx2 * y:
+        if p < 0:
+            quater.append([k + 1, y])
+            p += 2 * ry2 * (k + 1) + ry2
+        else:
+            y -= 1
+            quater.append([k + 1, y])
+            p += 2 * ry2 * (k + 1) - 2 * rx2 * y + ry2
+        k += 1
+    # 区域2
+    x, k = k, 0
+    p = ry2 * (x + 1/2) * (x + 1/2) + rx2 * (y - 1) - rx2 * ry2
+    for k in range(0, y):
+        if p > 0:
+            quater.append([x, y - k - 1])
+            p += rx2 - 2 * rx2 * (y-k-1)
+        else:
+            x += 1
+            quater.append([x, y - k - 1])
+            p += 2 * ry2 * x - 2 * rx2 * (y-k-1) + rx2
+    # 对称
+    full = []
+    for [x, y] in quater:
+        full.extend([[x,y], [-x, y], [x, -y], [-x, -y]])
+    # 平移
+    for [x, y] in full:
+        result.append([x + xc, y + yc])
+    return result
 
 def draw_curve(p_list, algorithm):
     """绘制曲线
