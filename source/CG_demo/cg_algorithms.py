@@ -3,6 +3,7 @@
 
 # 本文件只允许依赖math库
 import math
+import logging
 
 
 def draw_line(p_list, algorithm):
@@ -49,7 +50,6 @@ def draw_line(p_list, algorithm):
                 # 直线生成方向与坐标轴相反时交换起始点
                 x0, y0, x1, y1 = x1, y1, x0, y0
             result.append([x0, y0])
-            print('start to plot: ({},{}) -> ({},{})'.format(x0, y0, x1, y1))
             dx, dy = x1 - x0, y1 - y0
             p = 2 * dy - 2 * dx
             y = y0
@@ -61,7 +61,6 @@ def draw_line(p_list, algorithm):
                     result.append([x0 + k + 1, y + 1])
                     y = y + 1
                     p += (dy * 2 - dx * 2)
-            print('The last point:({}, {})'.format(result[-1][0], result[-1][1]))
         else:
             if y0 > y1:
                 x0, y0, x1, y1 = x1, y1, x0, y0
@@ -101,7 +100,6 @@ def draw_ellipse(p_list):
     :param p_list: (list of list of int: [[x0, y0], [x1, y1]]) 椭圆的矩形包围框左上角和右下角顶点坐标
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
-    print('start to generate ellipse.')
     x0, y0 = p_list[0]
     x1, y1 = p_list[1]
     result = []
@@ -110,7 +108,7 @@ def draw_ellipse(p_list):
     rx2, ry2 = rx * rx, ry * ry
     xc, yc = int((x1 + x0) / 2), int((y1 + y0) / 2)
     quater.append([0, ry])
-    p = ry2- rx2 *  ry + ry2 / 4
+    p = ry2- rx2 * ry + ry2 / 4
     x, y, k = 0, ry, 0
     # 区域1
     while 2 * ry2 * x < 2 * rx2 * y:
@@ -122,9 +120,11 @@ def draw_ellipse(p_list):
             quater.append([k + 1, y])
             p += 2 * ry2 * (k + 1) - 2 * rx2 * y + ry2
         k += 1
+        x = k
+    logging.debug('Area 1 stop at ({}, {})'.format(k, y))
     # 区域2
-    x, k = k, 0
-    p = ry2 * (x + 1/2) * (x + 1/2) + rx2 * (y - 1) - rx2 * ry2
+    k = 0
+    p = ry2 * (x + 1/2) * (x + 1/2) + rx2 * (y - 1) * (y - 1) - rx2 * ry2
     for k in range(0, y):
         if p > 0:
             quater.append([x, y - k - 1])

@@ -5,10 +5,12 @@ import sys
 import os
 import cg_algorithms as alg
 import numpy as np
+import logging
 from PIL import Image
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level = logging.DEBUG)
     input_file = sys.argv[1]
     output_dir = sys.argv[2]
     os.makedirs(output_dir, exist_ok=True)
