@@ -13,6 +13,7 @@ def draw_line(p_list, algorithm):
     :param algorithm: (string) 绘制使用的算法，包括'DDA'和'Bresenham'，此处的'Naive'仅作为示例，测试时不会出现
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
+    logging.debug('draw line for {} with {}'.format(p_list, algorithm))
     x0, y0 = p_list[0]
     x1, y1 = p_list[1]
     result = []
@@ -50,33 +51,36 @@ def draw_line(p_list, algorithm):
                 # 直线生成方向与坐标轴相反时交换起始点
                 x0, y0, x1, y1 = x1, y1, x0, y0
             result.append([x0, y0])
-            dx, dy = x1 - x0, y1 - y0
-            p = 2 * dy - 2 * dx
+            dx, dy = x1 - x0, abs(y1 - y0)
+            p = 2 * dy  - dx
             y = y0
+            step = int(dy / (y1 - y0))
             for k in range(0, dx):
                 if p < 0:
                     result.append([x0 + k + 1, y])
                     p += (dy * 2)
                 else:
-                    result.append([x0 + k + 1, y + 1])
-                    y = y + 1
+                    y += step
+                    result.append([x0 + k + 1, y])
                     p += (dy * 2 - dx * 2)
         else:
             if y0 > y1:
                 x0, y0, x1, y1 = x1, y1, x0, y0
             result.append([x0, y0])
             dx, dy = x1 - x0, y1 - y0
-            p = dx * 2 - dy * 2
+            p = dx * 2 - dy
             x = x0
+            step = int(dx / abs(dx))
+            dx = abs(dx)
             for k in range(0, dy):
                 if p < 0:
                     result.append([x, y0 + k +1])
                     p += (dx * 2)
                 else:
-                    result.append([x + 1, y0 + k + 1])
-                    x = x + 1
+                    x += step
+                    result.append([x, y0 + k + 1])
                     p += (dx * 2 - dy * 2)
-
+        logging.debug('Bresenham ends at {}'.format(result[-1]))
     return result
 
 
@@ -107,6 +111,7 @@ def draw_ellipse(p_list):
     rx, ry = (int(abs(x1 - x0) / 2), int(abs(y1 - y0) / 2))
     rx2, ry2 = rx * rx, ry * ry
     xc, yc = int((x1 + x0) / 2), int((y1 + y0) / 2)
+    logging.debug('draw ellipse at ({},{}), with rx={}, ry={}'.format(xc, yc, rx, ry))
     quater.append([0, ry])
     p = ry2- rx2 * ry + ry2 / 4
     x, y, k = 0, ry, 0
@@ -121,7 +126,6 @@ def draw_ellipse(p_list):
             p += 2 * ry2 * (k + 1) - 2 * rx2 * y + ry2
         k += 1
         x = k
-    logging.debug('Area 1 stop at ({}, {})'.format(k, y))
     # 区域2
     k = 0
     p = ry2 * (x + 1/2) * (x + 1/2) + rx2 * (y - 1) * (y - 1) - rx2 * ry2
@@ -183,7 +187,10 @@ def translate(p_list, dx, dy):
     :param dy: (int) 垂直方向平移量
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 变换后的图元参数
     """
-    pass
+    result = []
+    for a in p_list:
+        result.append([a[0] + dx, a[1] + dy])
+    return result
 
 
 def rotate(p_list, x, y, r):
@@ -195,19 +202,31 @@ def rotate(p_list, x, y, r):
     :param r: (int) 顺时针旋转角度（°）
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 变换后的图元参数
     """
-    pass
+    result = []
+    sinr = math.sin(r * math.pi / 180)
+    cosr = math.cos(r * math.pi / 180)
+    for [xx,yy] in p_list:
+        newx = x + (xx - x) * cosr - (yy - y) * sinr
+        newy = y + (xx - x) * sinr + (yy - y) * cosr
+        result.append([int(newx), int(newy)])
+        logging.debug('rotate {} to {}'.format([xx, yy], result[-1]))
+    return result
 
 
 def scale(p_list, x, y, s):
     """缩放变换
-
     :param p_list: (list of list of int: [[x0, y0], [x1, y1], [x2, y2], ...]) 图元参数
     :param x: (int) 缩放中心x坐标
     :param y: (int) 缩放中心y坐标
     :param s: (float) 缩放倍数
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 变换后的图元参数
     """
-    pass
+    result = []
+    cx, cy = x * (1 - s), y * (1 - s)
+    for [xx, yy] in p_list:
+        newx, newy = int(xx * s + cx), int(yy * s + cy)
+        result.append([newx, newy])
+    return result
 
 
 def clip(p_list, x_min, y_min, x_max, y_max, algorithm):

@@ -63,6 +63,13 @@ if __name__ == '__main__':
                 y1 = int(line[5])
                 algorithm = line[6]
                 item_dict[item_id] = ['line', [[x0, y0], [x1, y1]], algorithm, np.array(pen_color)]
+            elif line[0] == 'drawPolygon':
+                item_id = line[1]
+                p_list = []
+                for i in range(2, len(line) - 1, 2):
+                    p_list.append([int(line[i]), int(line[i + 1])])
+                algorithm = line[-1]
+                item_dict[item_id] = ['polygon', p_list, algorithm, np.array(pen_color)]
             elif line[0] == 'drawEllipse':
                 item_id = line[1]
                 x0 = int(line[2])
@@ -77,5 +84,22 @@ if __name__ == '__main__':
                     p_list.append([int(line[i]), int(line[i + 1])])
                 algorithm = line[-1]
                 item_dict[item_id] = ['curve', p_list, algorithm, np.array(pen_color)]
+            elif line[0] == 'translate':
+                item_id = line[1]
+                item_type, p_list, algorithm, color = item_dict[item_id]
+                p_list = alg.translate(p_list, int(line[2]), int(line[3]))
+                item_dict[item_id] = item_type, p_list, algorithm, color
+            elif line[0] == 'rotate':
+                item_id = line[1]
+                item_type, p_list, algorithm, color = item_dict[item_id]
+                p_list = alg.rotate(p_list, int(line[2]), int(line[3]), int(line[4]))
+                item_dict[item_id] = item_type, p_list, algorithm, color
+            elif line[0] == 'scale':
+                item_id = line[1]
+                item_type, p_list, algorithm, color = item_dict[item_id]
+                p_list = alg.scale(p_list, int(line[2]), int(line[3]), int(line[4]))
+                item_dict[item_id] = item_type, p_list, algorithm, color
+            else:
+                print('Invalid command: ' + line[0])
             line = fp.readline()
 

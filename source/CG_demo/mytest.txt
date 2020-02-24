@@ -1,8 +1,25 @@
-resetCanvas 600 600
+resetCanvas 1000 1000
 setColor 231 117 25
-drawCurve c1 100 300 150 150 200 220 250 270 300 300 Brezier
-drawLine l1 100 300 150 150 DDA
-drawLine l2 150 150 200 220 DDA
-drawLine l3 200 220 250 270 DDA
-drawLine l4 250 270 300 300 DDA
+drawEllipse e1 400 100 600 500 
+setColor 255 0 0
+drawEllipse e2 400 100 600 500 
+rotate e2 500 500 45
+setColor 255 255 0
+drawEllipse e3 400 100 600 500 
+rotate e3 500 500 90
+setColor 0 0 255
+drawEllipse e4 400 100 600 500 
+rotate e4 500 500 135
+setColor 0 255 0
+drawEllipse e5 400 100 600 500 
+rotate e5 500 500 180
+setColor 255 0 255
+drawEllipse e6 400 100 600 500 
+rotate e6 500 500 225
+setColor 0 255 255
+drawEllipse e7 400 100 600 500 
+rotate e7 500 500 270
+setColor 178 32 180
+drawEllipse e8 400 100 600 500 
+rotate e8 500 500 315
 saveCanvas 1
