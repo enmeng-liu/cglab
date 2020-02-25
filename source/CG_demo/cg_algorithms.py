@@ -228,10 +228,23 @@ def scale(p_list, x, y, s):
         result.append([newx, newy])
     return result
 
+def outcode(x, y, x_min, y_min, x_max, y_max):
+    """输出区域码，供线段Cohen-Sutherland裁剪算法使用
+    """
+    left, right, down, up = 0b0001, 0b0010, 0b0100, 0b1000
+    oc = 0
+    if x < x_min:
+        oc |= left
+    elif x > x_max:
+        oc |= right
+    if y < y_min:
+        oc |= up
+    elif y > y_max:
+        oc |= down
+    return oc
 
 def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
     """线段裁剪
-
     :param p_list: (list of list of int: [[x0, y0], [x1, y1]]) 线段的起点和终点坐标
     :param x_min: 裁剪窗口左上角x坐标
     :param y_min: 裁剪窗口左上角y坐标
@@ -240,4 +253,45 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
     :param algorithm: (string) 使用的裁剪算法，包括'Cohen-Sutherland'和'Liang-Barsky'
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1]]) 裁剪后线段的起点和终点坐标
     """
-    pass
+    result = []
+    [x0, y0], [x1, y1] = p_list
+    logging.debug('Start to clip {} with ({},{}) to ({},{})'.format(p_list, x_min, y_min, x_max, y_max))
+    if algorithm == 'Cohen-Sutherland':
+        oc0 = outcode(x0, y0, x_min, y_min, x_max, y_max)
+        oc1 = outcode(x1, y1, x_min, y_min, x_max, y_max)
+        accept = False
+        while True:
+            if oc0 == 0 and oc1 == 0:
+                # 两端点都在区域内
+                accept = True
+                break
+            elif (oc0 & oc1) != 0:
+                # 两端点都在区域外
+                break
+            else:
+                oc = oc0
+                if oc0 == 0:
+                    oc = oc1
+                left, right, down, up = 0b0001, 0b0010, 0b0100, 0b1000
+                dx, dy = x1 - x0, y1 - y0
+                if oc & left:
+                    x, y = x_min, (x_min - x0) * dy / dx + y0
+                elif oc & right:
+                    x, y = x_max, (x_max - x0) * dy / dx + y0
+                elif oc & up:
+                    x, y = (y_min - y0) * dx / dy + x0, y_min
+                elif oc & down:
+                    x, y = (y_max - y0) * dx / dy + x0, y_max
+                if oc == oc0:
+                    x0, y0, oc0 = x, y, outcode(x, y, x_min, y_min, x_max, y_max)
+                else:
+                    x1, y1, oc1 = x, y, outcode(x, y, x_min, y_min, x_max, y_max)
+                logging.debug('clip to ({}, {})-({}, {})'.format(x0, y0, x1, y1))
+        if accept:
+            result = [[int(x0), int(y0)], [int(x1), int(y1)]]
+        logging.debug('C-S clip get {}'.format(result))
+        return result
+    elif algorithm == 'Liang-Barsky':
+        pass
+    else:
+        print('Invalid algorithm: ' + algorithm)

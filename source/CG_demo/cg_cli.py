@@ -99,6 +99,16 @@ if __name__ == '__main__':
                 item_type, p_list, algorithm, color = item_dict[item_id]
                 p_list = alg.scale(p_list, int(line[2]), int(line[3]), int(line[4]))
                 item_dict[item_id] = item_type, p_list, algorithm, color
+            elif line[0] == 'clip':
+                item_id = line[1]
+                item_type, p_list, algorithm, color = item_dict[item_id]
+                if item_type != 'line':
+                    print('Cannot clip {} type'.format(item_type))
+                p_list = alg.clip(p_list, int(line[2]), int(line[3]), int(line[4]), int(line[5]), line[6])
+                if len(p_list):
+                    item_dict[item_id] = item_type, p_list, algorithm, color
+                else:
+                    del item_dict[item_id]
             else:
                 print('Invalid command: ' + line[0])
             line = fp.readline()
