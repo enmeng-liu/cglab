@@ -26,18 +26,14 @@ def draw_line(p_list, algorithm):
                 x0, y0, x1, y1 = x1, y1, x0, y0
             k = (y1 - y0) / (x1 - x0)
             for x in range(x0, x1 + 1):
-                result.append((x, int(y0 + k * (x - x0))))
+                result.append((x, round(y0 + k * (x - x0))))
     elif algorithm == 'DDA':
         dx, dy = x1 - x0, y1 - y0
-        if abs(dx) >= abs(dy):
-            # 斜率<=1
-            step = abs(dx)
-        else:
-            # 斜率>1
-            step = abs(dy)
+        step = max(abs(dx), abs(dy))
         dx, dy = dx / step, dy / step
         for i in range(0, step + 1):
-            result.append((int(x0 + dx * i), int(y0 + dy * i)))
+            result.append((round(x0 + dx * i), round(y0 + dy * i)))
+    #-----------------------------------------------
     elif algorithm == 'Bresenham':
         if x1 == x0:
             result = [[x0, y] for y in range(min(y0, y1), max(y0, y1) + 1)]
@@ -54,7 +50,7 @@ def draw_line(p_list, algorithm):
             dx, dy = x1 - x0, abs(y1 - y0)
             p = 2 * dy  - dx
             y = y0
-            step = int(dy / (y1 - y0))
+            step = round(dy / (y1 - y0))
             for k in range(0, dx):
                 if p < 0:
                     result.append([x0 + k + 1, y])
@@ -67,10 +63,10 @@ def draw_line(p_list, algorithm):
             if y0 > y1:
                 x0, y0, x1, y1 = x1, y1, x0, y0
             result.append([x0, y0])
-            dx, dy = x1 - x0, y1 - y0
+            dx, dy = abs(x1 - x0), y1 - y0
             p = dx * 2 - dy
             x = x0
-            step = int(dx / abs(dx))
+            step = round(dx / (x1 - x0))
             dx = abs(dx)
             for k in range(0, dy):
                 if p < 0:
@@ -80,7 +76,7 @@ def draw_line(p_list, algorithm):
                     x += step
                     result.append([x, y0 + k + 1])
                     p += (dx * 2 - dy * 2)
-        logging.debug('Bresenham ends at {}'.format(result[-1]))
+        # logging.debug('Bresenham ends at {}'.format(result[-1]))
     return result
 
 
@@ -107,22 +103,22 @@ def draw_ellipse(p_list):
     x0, y0 = p_list[0]
     x1, y1 = p_list[1]
     result = []
-    quater = []
-    rx, ry = (int(abs(x1 - x0) / 2), int(abs(y1 - y0) / 2))
+    quarter = []
+    rx, ry = (round(abs(x1 - x0) / 2), round(abs(y1 - y0) / 2))
     rx2, ry2 = rx * rx, ry * ry
-    xc, yc = int((x1 + x0) / 2), int((y1 + y0) / 2)
+    xc, yc = round((x1 + x0) / 2), round((y1 + y0) / 2)
     logging.debug('draw ellipse at ({},{}), with rx={}, ry={}'.format(xc, yc, rx, ry))
-    quater.append([0, ry])
-    p = ry2- rx2 * ry + ry2 / 4
+    quarter.append([0, ry])
+    p = ry2- rx2 * ry + rx2 / 4
     x, y, k = 0, ry, 0
     # 区域1
     while 2 * ry2 * x < 2 * rx2 * y:
         if p < 0:
-            quater.append([k + 1, y])
+            quarter.append([k + 1, y])
             p += 2 * ry2 * (k + 1) + ry2
         else:
             y -= 1
-            quater.append([k + 1, y])
+            quarter.append([k + 1, y])
             p += 2 * ry2 * (k + 1) - 2 * rx2 * y + ry2
         k += 1
         x = k
@@ -131,15 +127,15 @@ def draw_ellipse(p_list):
     p = ry2 * (x + 1/2) * (x + 1/2) + rx2 * (y - 1) * (y - 1) - rx2 * ry2
     for k in range(0, y):
         if p > 0:
-            quater.append([x, y - k - 1])
+            quarter.append([x, y - k - 1])
             p += rx2 - 2 * rx2 * (y-k-1)
         else:
             x += 1
-            quater.append([x, y - k - 1])
+            quarter.append([x, y - k - 1])
             p += 2 * ry2 * x - 2 * rx2 * (y-k-1) + rx2
     # 对称
     full = []
-    for [x, y] in quater:
+    for [x, y] in quarter:
         full.extend([[x,y], [-x, y], [x, -y], [-x, -y]])
     # 平移
     for [x, y] in full:
@@ -171,7 +167,7 @@ def draw_curve(p_list, algorithm):
                 col =  comb[j] * ((1-t) **(n-j)) * (t**j)
                 x += col * p_list[j][0]
                 y += col * p_list[j][1]
-            result.append([int(x), int(y)])
+            result.append([round(x), round(y)])
     elif algorithm == 'B-spline':
         pass
     else:
@@ -208,7 +204,7 @@ def rotate(p_list, x, y, r):
     for [xx,yy] in p_list:
         newx = x + (xx - x) * cosr - (yy - y) * sinr
         newy = y + (xx - x) * sinr + (yy - y) * cosr
-        result.append([int(newx), int(newy)])
+        result.append([round(newx), round(newy)])
         logging.debug('rotate {} to {}'.format([xx, yy], result[-1]))
     return result
 
@@ -224,7 +220,7 @@ def scale(p_list, x, y, s):
     result = []
     cx, cy = x * (1 - s), y * (1 - s)
     for [xx, yy] in p_list:
-        newx, newy = int(xx * s + cx), int(yy * s + cy)
+        newx, newy = round(xx * s + cx), round(yy * s + cy)
         result.append([newx, newy])
     return result
 
@@ -243,6 +239,30 @@ def outcode(x, y, x_min, y_min, x_max, y_max):
         oc |= down
     return oc
 
+def clipt(d, q, tl, tu):
+    """确定裁剪后线段上参数的最大值或最小值
+    """
+    t = q / d
+    visible = True
+    if d == 0 and q < 0:
+        # line is outside and parallel to the edge
+        visible = False
+    elif d < 0: 
+        # looking for upper limit
+        if t > tu:
+            # check for trivially invisible
+            visible = False
+        elif t > tl:
+            tl = t # find the minimum of the maximum
+    elif d > 0:
+        # looking for lower limit
+        if t < tl:
+            visible = False
+        elif t < tu:
+            tu = t
+    return visible, tl, tu
+
+
 def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
     """线段裁剪
     :param p_list: (list of list of int: [[x0, y0], [x1, y1]]) 线段的起点和终点坐标
@@ -256,6 +276,8 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
     result = []
     [x0, y0], [x1, y1] = p_list
     logging.debug('Start to clip {} with ({},{}) to ({},{})'.format(p_list, x_min, y_min, x_max, y_max))
+    if x_min > x_max or y_min > y_max:
+        return p_list
     if algorithm == 'Cohen-Sutherland':
         oc0 = outcode(x0, y0, x_min, y_min, x_max, y_max)
         oc1 = outcode(x1, y1, x_min, y_min, x_max, y_max)
@@ -286,12 +308,26 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
                     x0, y0, oc0 = x, y, outcode(x, y, x_min, y_min, x_max, y_max)
                 else:
                     x1, y1, oc1 = x, y, outcode(x, y, x_min, y_min, x_max, y_max)
-                logging.debug('clip to ({}, {})-({}, {})'.format(x0, y0, x1, y1))
+                # logging.debug('clip to ({}, {})-({}, {})'.format(x0, y0, x1, y1))
         if accept:
-            result = [[int(x0), int(y0)], [int(x1), int(y1)]]
+            result = [[round(x0), round(y0)], [round(x1), round(y1)]]
         logging.debug('C-S clip get {}'.format(result))
         return result
     elif algorithm == 'Liang-Barsky':
-        pass
+        tl, tu = 0, 1
+        dx, dy = x1 - x0, y1 - y0
+        visible, tl, tu = clipt(-dx, x0-x_min, tl, tu)
+        visible, tl, tu = clipt(dx, x_max-x0, tl, tu)
+        visible, tl, tu = clipt(-dy, y0-y_min, tl, tu) 
+        visible, tl, tu = clipt(dy, y_max-y0, tl, tu)
+        logging.debug("tl={}, tu={}".format(tl, tu))
+        if tu < 1:
+            x1, y1 = x0+tu*dx, y0+tu*dy
+        if tl > 0:
+            x0, y0 = x0+tl*dx, y0+tl*dy
+        if visible:
+            result = [[round(x0), round(y0)], [round(x1), round(y1)]]
+        return result
     else:
         print('Invalid algorithm: ' + algorithm)
+    return result

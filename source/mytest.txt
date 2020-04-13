@@ -1,0 +1,8 @@
+resetCanvas 1000 1000
+setColor 231 117 25
+drawLine l1 600 100 500 800 Bresenham
+clip l1 200 700 600 900 Cohen-Sutherland
+setColor 255 0 255
+drawLine l2 600 100 500 800 Bresenham
+clip l2 200 700 600 900 Liang-Barsky
+saveCanvas 1

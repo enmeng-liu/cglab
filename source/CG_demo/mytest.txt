@@ -1,9 +1,0 @@
-resetCanvas 1000 1000
-setColor 231 117 25
-drawLine l1 700 100 300 400 Bresenham
-setColor 255 0 255
-drawLine l2 700 100 300 400 DDA
-clip l2 200 300 500 600 Cohen-Sutherland 
-setColor 255 0 0
-drawPolygon p1 200 300 200 600 500 600 500 300 DDA
-saveCanvas 1

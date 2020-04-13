@@ -1,1 +1,6 @@
-1.bmp
+.vscode/*
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.bmp
