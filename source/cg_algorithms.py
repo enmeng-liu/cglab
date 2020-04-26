@@ -13,7 +13,7 @@ def draw_line(p_list, algorithm):
     :param algorithm: (string) 绘制使用的算法，包括'DDA'和'Bresenham'，此处的'Naive'仅作为示例，测试时不会出现
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
-    logging.debug('draw line for {} with {}'.format(p_list, algorithm))
+    # logging.debug('draw line for {} with {}'.format(p_list, algorithm))
     x0, y0 = p_list[0]
     x1, y1 = p_list[1]
     result = []
@@ -142,6 +142,7 @@ def draw_ellipse(p_list):
         result.append([x + xc, y + yc])
     return result
 
+
 def draw_curve(p_list, algorithm):
     """绘制曲线
 
@@ -150,28 +151,62 @@ def draw_curve(p_list, algorithm):
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
     logging.debug('Start to draw curve with {}'.format(p_list))
-    result = []
-    if algorithm == 'Brezier':
-        n = len(p_list) - 1 
-        # 计算二项式系数
+    result, points = [], []
+    n = len(p_list) # 控制点个数
+    if algorithm == 'Bezier':
+        # 计算n-1为底的二项式系数
         comb = []
         comb.append(1)
         for i in range(0, n):
-            comb.append(comb[i] / (i + 1) * (n - i))
-        # 计算Brezier曲线公式
-        prec = 300 #精度（我也不知道设多少好
-        for i in range(0, prec):
-            x, y = 0, 0
-            t = i / prec
-            for j in range(0, n + 1):
-                col =  comb[j] * ((1-t) **(n-j)) * (t**j)
-                x += col * p_list[j][0]
-                y += col * p_list[j][1]
-            result.append([round(x), round(y)])
+            comb.append(comb[i] / (i + 1) * (n - 1 - i))
+        # 计算Bezier曲线公式
+        step = 0.01
+        u = 0
+        while u <= 1:
+            x, y = 0.0, 0.0
+            for i in range(0, n):
+                x += comb[i] * math.pow(u, i) * math.pow(1-u, n-1-i) * p_list[i][0]
+                y += comb[i] * math.pow(u, i) * math.pow(1-u, n-1-i) * p_list[i][1]
+            points.append([round(x), round(y)])
+            u = u + step
     elif algorithm == 'B-spline':
-        pass
+        k = 4 #阶数
+        if n < k:
+            print('Not enough control points.')
+            return []
+        # 计算节点矢量
+        U = []
+        for i in range(0, n+k+1):
+            U.append(i*100/(n+k))
+        #子函数
+        def de_Boor_Cox(r, i, u):
+            """de Boor Cox公式递归计算x,y坐标
+            """
+            if r == 0:
+                return p_list[i]
+            tmp = 0
+            if u - U[i] == 0 and U[i+k-r] - U[i]  == 0:
+                tmp = 1
+            else:
+                tmp = (u - U[i]) / (U[i+k-r]-U[i])
+            x1, y1 = de_Boor_Cox(r-1, i, u)
+            x2, y2 = de_Boor_Cox(r-1, i-1, u)
+            x = tmp * x1 + (1-tmp) * x2
+            y = tmp * y1 + (1-tmp) * y2
+            return x,y
+        # 只在[t_{k-1}, t_n]上有定义，故只需在这个范围枚举j
+        step = 0.01
+        for j in range(k-1, n):
+            u = U[j]
+            while u < U[j + 1]:
+                p = de_Boor_Cox(k-1, j, u)
+                points.append([round(p[0]), round(p[1])])
+                u = u + step
     else:
-        raise ValueError('No such algorithm.')
+        print('No such algorithm.')
+    # 生成的点间用直线相连
+    for i in range(0, len(points)-1):
+        result = result + draw_line(points[i:i+2], 'Bresenham')
     return result
 
 

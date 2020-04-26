@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
-import sys
+import sys, logging
 import cg_algorithms as alg
 from typing import Optional
 from PyQt5.QtWidgets import (
@@ -14,6 +14,11 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QHBoxLayout,
     QWidget,
+    QColorDialog,
+    QInputDialog,
+    QDialog,
+    QDialogButtonBox,
+    QComboBox,
     QStyleOptionGraphicsItem)
 from PyQt5.QtGui import QPainter, QMouseEvent, QColor
 from PyQt5.QtCore import QRectF
@@ -34,11 +39,14 @@ class MyCanvas(QGraphicsView):
         self.temp_algorithm = ''
         self.temp_id = ''
         self.temp_item = None
+        self.temp_pen_color = None
 
-    def start_draw_line(self, algorithm, item_id):
+    def start_draw_line(self, algorithm, item_id, pen_color):
         self.status = 'line'
         self.temp_algorithm = algorithm
         self.temp_id = item_id
+        self.temp_pen_color = self.main_window.pen_color
+        logging.debug('draw line with color: {}'.format(self.temp_pen_color))
 
     def finish_draw(self):
         self.temp_id = self.main_window.get_id()
@@ -64,7 +72,7 @@ class MyCanvas(QGraphicsView):
         x = int(pos.x())
         y = int(pos.y())
         if self.status == 'line':
-            self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.temp_algorithm)
+            self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.temp_algorithm, self.temp_pen_color)
             self.scene().addItem(self.temp_item)
         self.updateScene([self.sceneRect()])
         super().mousePressEvent(event)
@@ -90,9 +98,8 @@ class MyItem(QGraphicsItem):
     """
     自定义图元类，继承自QGraphicsItem
     """
-    def __init__(self, item_id: str, item_type: str, p_list: list, algorithm: str = '', parent: QGraphicsItem = None):
+    def __init__(self, item_id: str, item_type: str, p_list: list, algorithm: str = '', color = QColor(255, 0, 0), parent: QGraphicsItem = None):
         """
-
         :param item_id: 图元ID
         :param item_type: 图元类型，'line'、'polygon'、'ellipse'、'curve'等
         :param p_list: 图元参数
@@ -105,14 +112,16 @@ class MyItem(QGraphicsItem):
         self.p_list = p_list        # 图元参数
         self.algorithm = algorithm  # 绘制算法，'DDA'、'Bresenham'、'Bezier'、'B-spline'等
         self.selected = False
+        self.color = color
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = ...) -> None:
         if self.item_type == 'line':
             item_pixels = alg.draw_line(self.p_list, self.algorithm)
             for p in item_pixels:
+                painter.setPen(self.color)
                 painter.drawPoint(*p)
             if self.selected:
-                painter.setPen(QColor(255, 0, 0))
+                painter.setPen(QColor(255,0,0))
                 painter.drawRect(self.boundingRect())
         elif self.item_type == 'polygon':
             pass
@@ -145,18 +154,15 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.item_cnt = 0
+        self.pen_color = QColor(0,0,0)
 
         # 使用QListWidget来记录已有的图元，并用于选择图元。注：这是图元选择的简单实现方法，更好的实现是在画布中直接用鼠标选择图元
-        self.list_widget = QListWidget(self)
-        self.list_widget.setMinimumWidth(200)
+        # self.list_widget = QListWidget(self)
+        # self.list_widget.setMinimumWidth(200)
+        # self.list_widget.setMaximumWidth(200)
 
-        # 使用QGraphicsView作为画布
-        self.scene = QGraphicsScene(self)
-        self.scene.setSceneRect(0, 0, 600, 600)
-        self.canvas_widget = MyCanvas(self.scene, self)
-        self.canvas_widget.setFixedSize(600, 600)
-        self.canvas_widget.main_window = self
-        self.canvas_widget.list_widget = self.list_widget
+        self.height = self.width = 600
+        self.set_canvas()
 
         # 设置菜单栏
         menubar = self.menuBar()
@@ -186,9 +192,71 @@ class MainWindow(QMainWindow):
 
         # 连接信号和槽函数
         exit_act.triggered.connect(qApp.quit)
+        reset_canvas_act.triggered.connect(self.reset_canvas_action)
         line_naive_act.triggered.connect(self.line_naive_action)
         self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
+        set_pen_act.triggered.connect(self.set_pen_action)
 
+    def get_id(self):
+        _id = str(self.item_cnt)
+        self.item_cnt += 1
+        return _id
+    
+    def set_pen_action(self):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self.pen_color = color
+            logging.debug('set pen color to {}'.format(color))
+
+    def line_naive_action(self):
+        # self.canvas_widget.start_draw_line('Naive', self.get_id())
+        self.canvas_widget.start_draw_line('Naive', self.get_id(), self.pen_color)
+        self.statusBar().showMessage('Naive算法绘制线段')
+        self.list_widget.clearSelection()
+        self.canvas_widget.clear_selection()
+    
+    def clear_canvas_action(self):
+        """清空画布
+        """
+        pass
+    
+    def reset_canvas_action(self):
+        self.clear_canvas_action()
+        while True:
+            width, ok = QInputDialog.getInt(self, '重置画布', '请输入画布宽度：（单位：像素）')
+            if ok and width <= 1000 and width >= 100:
+                self.width = width
+                logging.debug('set width to {}'.format(self.width))
+                break
+            elif not ok: 
+                break
+        while True:
+            height, ok = QInputDialog.getInt(self, '重置画布', '请输入画布高度：（单位：像素）')
+            if ok and height <= 1000 and height >= 100:
+                self.height = height
+                logging.debug('set height to {}'.format(self.height))
+                break
+            elif not ok: 
+                break
+        del self.scene
+        del self.canvas_widget
+        del self.hbox_layout
+        del self.list_widget
+        self.item_cnt = 0
+        self.set_canvas()
+        
+    
+    def set_canvas(self):
+        # 使用QGraphicsView作为画布
+        self.scene = QGraphicsScene(self)
+        self.scene.setSceneRect(0, 0, self.width, self.height)
+        self.canvas_widget = MyCanvas(self.scene, self)
+        self.canvas_widget.setFixedSize(self.width, self.height)
+        self.canvas_widget.main_window = self
+        self.list_widget = QListWidget(self)
+        self.list_widget.setMinimumWidth(200)
+        self.list_widget.setMaximumWidth(200)
+        self.canvas_widget.list_widget = self.list_widget
         # 设置主窗口的布局
         self.hbox_layout = QHBoxLayout()
         self.hbox_layout.addWidget(self.canvas_widget)
@@ -196,23 +264,14 @@ class MainWindow(QMainWindow):
         self.central_widget = QWidget()
         self.central_widget.setLayout(self.hbox_layout)
         self.setCentralWidget(self.central_widget)
-        self.statusBar().showMessage('空闲')
-        self.resize(600, 600)
+        self.statusBar().showMessage('新画布：({}*{})'.format(self.height, self.width))
+        self.resize(self.width, self.height)
         self.setWindowTitle('CG Demo')
-
-    def get_id(self):
-        _id = str(self.item_cnt)
-        self.item_cnt += 1
-        return _id
-
-    def line_naive_action(self):
-        self.canvas_widget.start_draw_line('Naive', self.get_id())
-        self.statusBar().showMessage('Naive算法绘制线段')
-        self.list_widget.clearSelection()
-        self.canvas_widget.clear_selection()
+        
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
     app = QApplication(sys.argv)
     mw = MainWindow()
     mw.show()
