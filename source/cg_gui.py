@@ -56,24 +56,34 @@ class MyCanvas(QGraphicsView):
             self.item_dict[self.selected_id].selected = False
             self.selected_id = ''
 
-    def selection_changed(self, selected):
-        self.main_window.statusBar().showMessage('图元选择： %s' % selected)
+    def selection_changed_by_id(self, selected_id):
+        self.main_window.statusBar().showMessage('图元选择： %s' % selected_id)
         if self.selected_id != '':
             self.item_dict[self.selected_id].selected = False
             self.item_dict[self.selected_id].update()
-        self.selected_id = selected
-        self.item_dict[selected].selected = True
-        self.item_dict[selected].update()
+        self.selected_id = selected_id
+        self.item_dict[selected_id].selected = True
+        self.item_dict[selected_id].update()
         self.status = ''
-        self.updateScene([self.sceneRect()])
+        self.updateScene([self.sceneRect()])    
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         pos = self.mapToScene(event.localPos().toPoint())
         x = int(pos.x())
         y = int(pos.y())
         if self.status == 'line':
+            # 绘制直线
             self.temp_item = MyItem(self.temp_id, self.status, [[x, y], [x, y]], self.temp_algorithm, self.temp_pen_color)
             self.scene().addItem(self.temp_item)
+        elif self.status == '':
+            # 选择图元
+            selected_items = self.items(x,y)
+            if len(selected_items) > 0:
+                selected_id = getattr(selected_items[0], 'id')
+                self.selection_changed_by_id(selected_id)
+            else:
+                self.main_window.statusBar().showMessage('空闲：(%d, %d)' % (x, y))
+                self.clear_selection()
         self.updateScene([self.sceneRect()])
         super().mousePressEvent(event)
 
@@ -83,6 +93,8 @@ class MyCanvas(QGraphicsView):
         y = int(pos.y())
         if self.status == 'line':
             self.temp_item.p_list[1] = [x, y]
+        elif self.status == '':
+            self.main_window.statusBar().showMessage('空闲：(%d, %d)' % (x,y))
         self.updateScene([self.sceneRect()])
         super().mouseMoveEvent(event)
 
@@ -91,6 +103,7 @@ class MyCanvas(QGraphicsView):
             self.item_dict[self.temp_id] = self.temp_item
             self.list_widget.addItem(self.temp_id)
             self.finish_draw()
+        self.status = ''
         super().mouseReleaseEvent(event)
 
 
@@ -194,10 +207,13 @@ class MainWindow(QMainWindow):
         reset_canvas_act.triggered.connect(self.reset_canvas_action)
         save_canvas_act.triggered.connect(self.save_canvas_action)
         line_naive_act.triggered.connect(self.line_naive_action)
-        self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed)
+        self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed_by_id)
         set_pen_act.triggered.connect(self.set_pen_action)
 
     def get_id(self):
+        return self.item_cnt
+
+    def new_id(self):
         _id = str(self.item_cnt)
         self.item_cnt += 1
         return _id
@@ -206,11 +222,10 @@ class MainWindow(QMainWindow):
         color = QColorDialog.getColor()
         if color.isValid():
             self.canvas_widget.temp_pen_color = color
-            # logging.debug('set pen color to {}'.format(color))
+            # logging.debug('set pen color to {}'.format(color))git
 
     def line_naive_action(self):
-        # self.canvas_widget.start_draw_line('Naive', self.get_id())
-        self.canvas_widget.start_draw_line('Naive', self.get_id())
+        self.canvas_widget.start_draw_line('Naive', self.new_id())
         self.statusBar().showMessage('Naive算法绘制线段')
         self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
@@ -262,7 +277,7 @@ class MainWindow(QMainWindow):
         self.scene = QGraphicsScene(self)
         self.scene.setSceneRect(0, 0, self.width, self.height)
         self.canvas_widget = MyCanvas(self.scene, self)
-        self.canvas_widget.setFixedSize(self.width+100, self.height+100)
+        self.canvas_widget.setFixedSize(self.width+10, self.height+10)
         self.canvas_widget.main_window = self
         # 使用QListWidget来记录已有的图元，并用于选择图元。注：这是图元选择的简单实现方法，更好的实现是在画布中直接用鼠标选择图元
         self.list_widget = QListWidget(self)
