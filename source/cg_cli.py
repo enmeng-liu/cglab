@@ -19,6 +19,12 @@ if __name__ == '__main__':
     pen_color = np.zeros(3, np.uint8)
     width = 0
     height = 0
+    draw_dict = {
+        'line': alg.draw_line,
+        'polygon': alg.draw_polygon,
+        'ellipse': alg.draw_ellipse,
+        'curve': alg.draw_curve
+    }
 
     with open(input_file, 'r') as fp:
         line = fp.readline()
@@ -27,6 +33,7 @@ if __name__ == '__main__':
             if line[0][0] == '#':
                 pass #注释
             if line[0] == 'resetCanvas':
+                item_dict.clear() #清空画布
                 width = int(line[1])
                 height = int(line[2])
             elif line[0] == 'saveCanvas':
@@ -34,22 +41,9 @@ if __name__ == '__main__':
                 canvas = np.zeros([height, width, 3], np.uint8)
                 canvas.fill(255)
                 for item_type, p_list, algorithm, color in item_dict.values():
-                    if item_type == 'line':
-                        pixels = alg.draw_line(p_list, algorithm)
-                        for x, y in pixels:
-                            canvas[y, x] = color
-                    elif item_type == 'polygon':
-                        pixels = alg.draw_polygon(p_list, algorithm)
-                        for x,y in pixels:
-                            canvas[y, x] = color
-                    elif item_type == 'ellipse':
-                        pixels = alg.draw_ellipse(p_list)
-                        for x, y in pixels:
-                            canvas[y, x] = color
-                    elif item_type == 'curve':
-                        pixels = alg.draw_curve(p_list, algorithm)
-                        for x,y in pixels:
-                            canvas[y, x] = color
+                    pixels = draw_dict[item_type](p_list, algorithm)
+                    for x,y in pixels:
+                        canvas[y, x] = color
                 Image.fromarray(canvas).save(os.path.join(output_dir, save_name + '.bmp'), 'bmp')
             elif line[0] == 'setColor':
                 pen_color[0] = int(line[1])
@@ -66,8 +60,9 @@ if __name__ == '__main__':
             elif line[0] == 'drawPolygon':
                 item_id = line[1]
                 p_list = []
-                for i in range(2, len(line) - 1, 2):
+                for i in range(1, len(line) - 1, 2):
                     p_list.append([int(line[i]), int(line[i + 1])])
+                    logging.debug('append {}'.format(p_list[-1]))
                 algorithm = line[-1]
                 item_dict[item_id] = ['polygon', p_list, algorithm, np.array(pen_color)]
             elif line[0] == 'drawEllipse':

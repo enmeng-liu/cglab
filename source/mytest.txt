@@ -5,4 +5,8 @@ drawLine l2 300 300 700 300 Bresenham
 drawLine l3 700 300 900 100 Bresenham
 setColor 255 0 255
 drawCurve c1 100 100 300 300 700 300 900 100 B-spline
+setColor 76 231 162
+drawEllipse e1 200 200 700 800
+setColor 64 52 113
+drawPolygon 500 500 600 400 700 400 800 500 700 600 600 600 Bresenham
 saveCanvas 1
