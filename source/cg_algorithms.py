@@ -88,7 +88,7 @@ def draw_polygon(p_list, algorithm):
     :param algorithm: (string) 绘制使用的算法，包括'DDA'和'Bresenham'
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
-    logging.debug('alg: draw polygon with p_list={}'.format(p_list))
+    # logging.debug('alg: draw polygon with p_list={}'.format(p_list))
     result = []
     for i in range(len(p_list)):
         line = draw_line([p_list[i - 1], p_list[i]], algorithm)
@@ -102,6 +102,8 @@ def draw_ellipse(p_list, algorithm):
     :param p_list: (list of list of int: [[x0, y0], [x1, y1]]) 椭圆的矩形包围框左上角和右下角顶点坐标
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
+    if p_list[0] == p_list[1]:
+        return [p_list[0],]
     x0, y0 = p_list[0]
     x1, y1 = p_list[1]
     result = []
@@ -109,7 +111,7 @@ def draw_ellipse(p_list, algorithm):
     rx, ry = (round(abs(x1 - x0) / 2), round(abs(y1 - y0) / 2))
     rx2, ry2 = rx * rx, ry * ry
     xc, yc = round((x1 + x0) / 2), round((y1 + y0) / 2)
-    logging.debug('draw ellipse at ({},{}), with rx={}, ry={}'.format(xc, yc, rx, ry))
+    # logging.debug('draw ellipse at ({},{}), with rx={}, ry={}'.format(xc, yc, rx, ry))
     quarter.append([0, ry])
     p = ry2- rx2 * ry + rx2 / 4
     x, y, k = 0, ry, 0
