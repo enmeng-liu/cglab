@@ -95,6 +95,14 @@ def draw_polygon(p_list, algorithm):
         result += line
     return result
 
+def draw_rect(p_list, algorithm):
+    """绘制矩形（GUI中使用）
+    ：param p_list: (list of list of int: [[x0, y0], [x1, y1]]) 矩形的左上角和右下角顶点坐标
+    ：return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
+    """
+    x0, y0 = p_list[0]
+    x1, y1 = p_list[1]
+    return draw_polygon([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], 'Bresenham')
 
 def draw_ellipse(p_list, algorithm):
     """绘制椭圆（采用中点圆生成算法）
@@ -222,6 +230,7 @@ def translate(p_list, dx, dy):
     :param dy: (int) 垂直方向平移量
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 变换后的图元参数
     """
+    # logging.debug('translate (%d, %d)' % (dx, dy))
     result = []
     for a in p_list:
         result.append([a[0] + dx, a[1] + dy])

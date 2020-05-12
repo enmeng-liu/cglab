@@ -33,9 +33,9 @@ if __name__ == '__main__':
             if line[0][0] == '#':
                 pass #注释
             if line[0] == 'resetCanvas':
-                item_dict.clear() #清空画布
                 width = int(line[1])
                 height = int(line[2])
+                item_dict = {}
             elif line[0] == 'saveCanvas':
                 save_name = line[1]
                 canvas = np.zeros([height, width, 3], np.uint8)
@@ -43,7 +43,7 @@ if __name__ == '__main__':
                 for item_type, p_list, algorithm, color in item_dict.values():
                     pixels = draw_dict[item_type](p_list, algorithm)
                     for x,y in pixels:
-                        canvas[y, x] = color
+                        canvas[height - 1 - y, x] = color
                 Image.fromarray(canvas).save(os.path.join(output_dir, save_name + '.bmp'), 'bmp')
             elif line[0] == 'setColor':
                 pen_color[0] = int(line[1])
@@ -87,7 +87,7 @@ if __name__ == '__main__':
             elif line[0] == 'rotate':
                 item_id = line[1]
                 item_type, p_list, algorithm, color = item_dict[item_id]
-                p_list = alg.rotate(p_list, int(line[2]), int(line[3]), int(line[4]))
+                p_list = alg.rotate(p_list, int(line[2]), int(line[3]), -int(line[4]))
                 item_dict[item_id] = item_type, p_list, algorithm, color
             elif line[0] == 'scale':
                 item_id = line[1]

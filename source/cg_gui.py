@@ -21,9 +21,8 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QFileDialog,
     QStyleOptionGraphicsItem)
-from PyQt5.QtGui import QPainter, QMouseEvent, QColor, QImage
-from PyQt5.QtCore import QRectF
-
+from PyQt5.QtGui import QPainter, QMouseEvent, QColor, QImage, QPen
+from PyQt5.QtCore import QRectF, Qt
 
 class MyCanvas(QGraphicsView):
     """
@@ -42,6 +41,18 @@ class MyCanvas(QGraphicsView):
         self.temp_item = None
         self.temp_pen_color = QColor(0, 0, 0)
         self.polygon_cnt = 0
+        self.mouse_pos = []
+        self.aux_item = None #辅助图元，用于裁剪等功能
+    
+    def delete_item(self, item_id):
+        if(item_id == self.selected_id):
+            self.selected_id = ''
+        self.scene().removeItem(self.item_dict[item_id])
+        self.updateScene([self.sceneRect()])
+        item_list = self.main_window.list_widget.findItems(item_id + ' ' + self.item_dict[item_id].item_type, Qt.MatchExactly)
+        self.main_window.list_widget.removeItemWidget(item_list[0])
+        del self.item_dict[item_id]
+        
 
     def start_draw_line(self, algorithm, item_id):
         self.status = 'line'
@@ -60,6 +71,21 @@ class MyCanvas(QGraphicsView):
         self.status = 'ellipse'
         self.temp_algorithm = ''
         self.temp_id = item_id
+    
+    def start_translate_item(self):
+        if(self.selected_id == ''):
+            self.main_window.statusBar().showMessage('请选择待平移图元')
+            return
+        self.status = 'translate'
+        self.temp_item = self.item_dict[self.selected_id]
+    
+    def start_clip_line(self, algorithm):
+        if(self.selected_id == ''):
+            self.main_window.statusBar().showMessage('请选择待裁剪图元')
+            return
+        self.status = 'clip'
+        self.temp_item = self.item_dict[self.selected_id]
+        self.temp_algorithm = algorithm
 
     def finish_draw(self):
         self.temp_id = self.main_window.new_id()
@@ -117,6 +143,11 @@ class MyCanvas(QGraphicsView):
             # 绘制椭圆
             self.temp_item = MyItem(self.temp_id, self.status, [[x,y], [x,y]], self.temp_algorithm, self.temp_pen_color)
             self.scene().addItem(self.temp_item)
+        elif self.status == 'translate':
+            self.mouse_pos = [x,y]
+        elif self.status == 'clip':
+            self.aux_item = MyItem('aux', 'aux_rect', [[x,y], [x,y]], '', QColor(255, 0, 0))
+            self.scene().addItem(self.aux_item)
         elif self.status == '':
             # 选择图元
             selected_items = self.items(x,y)
@@ -139,6 +170,14 @@ class MyCanvas(QGraphicsView):
             self.temp_item.p_list[1] = [x, y]
         elif self.status == 'ellipse':
             self.temp_item.p_list[1] = [x, y]
+        elif self.status == 'translate':
+            self.main_window.statusBar().showMessage('平移 %s：(%d, %d)' % (self.selected_id, x,y))
+            new_p_list = alg.translate(self.temp_item.p_list, x-self.mouse_pos[0], y-self.mouse_pos[1])
+            self.mouse_pos = [x,y]
+            self.temp_item.p_list = new_p_list
+        elif self.status == 'clip':
+            self.aux_item.p_list[1] = [x,y]
+            self.main_window.statusBar().showMessage('裁剪 %s：(%d, %d) - (%d, %d)' % (self.selected_id, self.aux_item.p_list[0][0], self.aux_item.p_list[0][1], x,y))
         elif self.status == '':
             self.main_window.statusBar().showMessage('空闲：(%d, %d)' % (x,y))
         self.updateScene([self.sceneRect()])
@@ -147,16 +186,29 @@ class MyCanvas(QGraphicsView):
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if self.status == 'line':
             self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id +' 线段')
+            self.list_widget.addItem(self.temp_id + ' ' + self.status)
             self.finish_draw()
             self.status = ''
         elif self.status == 'polygon':
             pass
         elif self.status == 'ellipse':
             self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id +' （椭）圆')
+            self.list_widget.addItem(self.temp_id + ' ' +  self.status)
             self.finish_draw()
             self.status = ''
+        elif self.status == 'translate':
+            self.main_window.statusBar().showMessage('平移完成')
+            self.status = ''
+        elif self.status == 'clip':
+            new_p_list = alg.clip(self.temp_item.p_list, self.aux_item.p_list[0][0], self.aux_item.p_list[0][1], self.aux_item.p_list[1][0], self.aux_item.p_list[1][1], self.temp_algorithm)
+            if not new_p_list:
+                self.delete_item(self.selected_id)
+            else:
+                self.temp_item.p_list = new_p_list
+            self.main_window.statusBar().showMessage('裁剪完成')
+            self.status = ''
+            self.scene().removeItem(self.aux_item)
+            self.updateScene([self.sceneRect()])
         super().mouseReleaseEvent(event)
     
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
@@ -171,7 +223,7 @@ class MyCanvas(QGraphicsView):
             self.temp_item = MyItem(self.temp_id, 'polygon', p_list, self.temp_algorithm, self.temp_pen_color)
             self.scene().addItem(self.temp_item)
             self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id +' 多边形')
+            self.list_widget.addItem(self.temp_id +' ' + self.status)
             self.finish_draw()
             self.status = ''
         self.updateScene([self.sceneRect()])
@@ -208,14 +260,24 @@ class MyItem(QGraphicsItem):
             'line': alg.draw_line,
             'polygon': alg.draw_polygon,
             'ellipse': alg.draw_ellipse,
-            'curve': alg.draw_curve
+            'curve': alg.draw_curve,
+            'aux_rect': alg.draw_rect
         }
         item_pixels = draw_dict[self.item_type](self.p_list, self.algorithm)
         for p in item_pixels:
-            painter.setPen(self.color)
+            if self.item_type != 'aux_rect':
+                painter.setPen(self.color) 
+            else:
+                pen = QPen()
+                pen.setStyle(Qt.DashLine)
+                pen.setBrush(Qt.red)
+                painter.setPen(pen)
             painter.drawPoint(*p)
         if self.selected:
-            painter.setPen(QColor(255, 0 ,0))
+            pen = QPen()
+            pen.setStyle(Qt.DashLine)
+            pen.setBrush(Qt.red)
+            painter.setPen(pen)
             painter.drawRect(self.boundingRect())
 
     def boundingRect(self) -> QRectF:
@@ -237,6 +299,9 @@ class MyItem(QGraphicsItem):
             min_y = min(y0, y1)
             max_x = max(x0, x1)
             max_y = max(y0, y1)
+        elif self.item_type == 'aux_rect':
+            min_x, min_y = self.p_list[0]
+            max_x, max_y = self.p_list[1]
         elif self.item_type == 'curve':
             pass
         return QRectF(min_x-1,  min_y-1, max_x-min_x+2, max_y-min_y+2)
@@ -298,6 +363,9 @@ class MainWindow(QMainWindow):
         polygon_bresenham_act.triggered.connect(self.polygon_bresenham_action)
         ellipse_act.triggered.connect(self.ellipse_action)
         self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed_from_list)
+        # -------------------编辑--------------------
+        translate_act.triggered.connect(self.translate_action)
+        clip_cohen_sutherland_act.triggered.connect(self.clip_cohen_sutherland_action)
 
     def get_id(self):
         return str(self.item_cnt)
@@ -316,7 +384,6 @@ class MainWindow(QMainWindow):
     def line_naive_action(self):
         self.canvas_widget.start_draw_line('Naive', self.get_id())
         self.statusBar().showMessage('Naive算法绘制线段')
-        # self.list_widget.clearSelection()
         self.canvas_widget.clear_selection()
 
     def line_dda_action(self):
@@ -343,6 +410,14 @@ class MainWindow(QMainWindow):
         self.canvas_widget.start_draw_ellipse(self.get_id())
         self.statusBar().showMessage('绘制椭圆')
         self.canvas_widget.clear_selection()
+    
+    def translate_action(self):
+        self.statusBar().showMessage('平移')
+        self.canvas_widget.start_translate_item()
+    
+    def clip_cohen_sutherland_action(self):
+        self.statusBar().showMessage('Cohen-Sutherland算法裁剪')
+        self.canvas_widget.start_clip_line('Cohen-Sutherland')
 
     def clear_canvas_action(self):
         """清空画布

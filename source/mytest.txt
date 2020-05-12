@@ -1,12 +1,7 @@
 resetCanvas 1000 1000
 setColor 231 117 25
-drawLine l1 100 100 300 300 Bresenham
-drawLine l2 300 300 700 300 Bresenham
-drawLine l3 700 300 900 100 Bresenham
-setColor 255 0 255
-drawCurve c1 100 100 300 300 700 300 900 100 B-spline
-setColor 76 231 162
-drawEllipse e1 200 200 700 800
-setColor 64 52 113
-drawPolygon 500 500 600 400 700 400 800 500 700 600 600 600 Bresenham
+drawLine l1 500 500 700 700 Bresenham
+translate l1 0 200
+setColor 255 0 0 
+drawLine l2 500 500 700 700 Bresenham
 saveCanvas 1
