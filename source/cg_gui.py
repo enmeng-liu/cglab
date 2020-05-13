@@ -86,6 +86,15 @@ class MyCanvas(QGraphicsView):
         self.status = 'clip'
         self.temp_item = self.item_dict[self.selected_id]
         self.temp_algorithm = algorithm
+    
+    def start_scale_item(self):
+        if(self.selected_id == ''):
+            self.main_window.statusBar().showMessage('请选择待缩放图元')
+            return
+        self.status = 'scale'
+        self.temp_item = self.item_dict[self.selected_id]
+        self.temp_item.scale_flag = True
+        self.updateScene([self.sceneRect()])
 
     def finish_draw(self):
         self.temp_id = self.main_window.new_id()
@@ -145,9 +154,21 @@ class MyCanvas(QGraphicsView):
             self.scene().addItem(self.temp_item)
         elif self.status == 'translate':
             self.mouse_pos = [x,y]
+            if not self.temp_item.in_boundingRect(x,y):
+                self.status = ''
+                self.temp_item.selected = False
+                self.main_window.statusBar().showMessage('平移结束')
         elif self.status == 'clip':
             self.aux_item = MyItem('aux', 'aux_rect', [[x,y], [x,y]], '', QColor(255, 0, 0))
             self.scene().addItem(self.aux_item)
+        elif self.status == 'scale':
+            self.mouse_pos = [x,y]
+            self.temp_item.center = self.temp_item.get_scale_center(x, y)
+            if not self.temp_item.center:
+                self.status = ''
+                self.temp_item.scale_flag = False
+                self.temp_item.selected = False
+                self.main_window.statusBar().showMessage('缩放结束')
         elif self.status == '':
             # 选择图元
             selected_items = self.items(x,y)
@@ -178,6 +199,10 @@ class MyCanvas(QGraphicsView):
         elif self.status == 'clip':
             self.aux_item.p_list[1] = [x,y]
             self.main_window.statusBar().showMessage('裁剪 %s：(%d, %d) - (%d, %d)' % (self.selected_id, self.aux_item.p_list[0][0], self.aux_item.p_list[0][1], x,y))
+        elif self.status == 'scale':
+            self.temp_item.scale(x)
+            self.mouse_pos = [x,y]
+            self.main_window.statusBar().showMessage('缩放 %s: (%d, %d)' % (self.selected_id, x, y))
         elif self.status == '':
             self.main_window.statusBar().showMessage('空闲：(%d, %d)' % (x,y))
         self.updateScene([self.sceneRect()])
@@ -198,7 +223,7 @@ class MyCanvas(QGraphicsView):
             self.status = ''
         elif self.status == 'translate':
             self.main_window.statusBar().showMessage('平移完成')
-            self.status = ''
+            # self.status = ''
         elif self.status == 'clip':
             new_p_list = alg.clip(self.temp_item.p_list, self.aux_item.p_list[0][0], self.aux_item.p_list[0][1], self.aux_item.p_list[1][0], self.aux_item.p_list[1][1], self.temp_algorithm)
             if not new_p_list:
@@ -208,7 +233,10 @@ class MyCanvas(QGraphicsView):
             self.main_window.statusBar().showMessage('裁剪完成')
             self.status = ''
             self.scene().removeItem(self.aux_item)
-            self.updateScene([self.sceneRect()])
+        elif self.status == 'scale':
+            self.main_window.statusBar().showMessage('缩放完成')
+            # self.status = ''
+        self.updateScene([self.sceneRect()])
         super().mouseReleaseEvent(event)
     
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
@@ -253,6 +281,8 @@ class MyItem(QGraphicsItem):
         self.algorithm = algorithm  # 绘制算法，'DDA'、'Bresenham'、'Bezier'、'B-spline'等
         self.selected = False
         self.color = color
+        self.scale_flag = False
+        self.center = [] # 操作中心，用于缩放和旋转
         # logging.debug('create MyItem {} with p_list={}'.format(item_type, p_list))
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = ...) -> None:
@@ -279,8 +309,13 @@ class MyItem(QGraphicsItem):
             pen.setBrush(Qt.red)
             painter.setPen(pen)
             painter.drawRect(self.boundingRect())
+            if self.scale_flag:
+                self.scale_vertex(painter)
 
-    def boundingRect(self) -> QRectF:
+    def get_bound(self):
+        """得到图元的左上角和右下角点的坐标
+        :return: [[minx, miny], [maxx, maxy]]
+        """
         min_x, min_y, max_x, max_y = 1001, 1001, -1, -1
         if self.item_type == 'line':
             x0, y0 = self.p_list[0]
@@ -304,7 +339,55 @@ class MyItem(QGraphicsItem):
             max_x, max_y = self.p_list[1]
         elif self.item_type == 'curve':
             pass
+        return [[min_x, min_y], [max_x, max_y]]
+
+    def scale_vertex(self, painter):
+        """给图元的外接矩形的顶点加上小矩形
+        """
+        bound_p_list = self.get_bound()
+        min_x, min_y = bound_p_list[0]
+        max_x, max_y = bound_p_list[1]
+        sz = 12
+        painter.drawRect(QRectF(min_x-sz/2, min_y-sz/2, sz, sz))
+        painter.drawRect(QRectF(min_x-sz/2, max_y-sz/2, sz, sz))
+        painter.drawRect(QRectF(max_x-sz/2, min_y-sz/2, sz, sz))
+        painter.drawRect(QRectF(max_x-sz/2, max_y-sz/2, sz, sz))
+    
+    def get_scale_center(self, x, y):
+        """根据鼠标点击的位置返回缩放中心
+        """
+        bound_p_list = self.get_bound()
+        min_x, min_y = bound_p_list[0]
+        max_x, max_y = bound_p_list[1]
+        half_sz = 6
+        if abs(x-min_x) <= half_sz and abs(y-min_y) <= half_sz:
+            return [max_x, max_y]
+        if abs(x-min_x) <= half_sz and abs(y-max_y) <= half_sz:
+            return [max_x, min_y]
+        if abs(x-max_x) <= half_sz and abs(y-min_y) <= half_sz:
+            return [min_x, max_y]
+        if abs(x-max_x) <= half_sz and abs(y-max_y) <= half_sz:
+            return [min_x, min_y]
+        return []
+    
+    def scale(self, new_x):
+        """根据横坐标增量进行缩放
+        """
+        s = abs(new_x - self.center[0]) / (self.p_list[1][0] - self.p_list[0][0])
+        new_p_list = alg.scale(self.p_list, self.center[0], self.center[1], s)
+        self.p_list = new_p_list
+    
+    def boundingRect(self) -> QRectF:
+        bound_p_list = self.get_bound()
+        min_x, min_y = bound_p_list[0]
+        max_x, max_y = bound_p_list[1]
         return QRectF(min_x-1,  min_y-1, max_x-min_x+2, max_y-min_y+2)
+    
+    def in_boundingRect(self, x, y):
+        bound_p_list = self.get_bound()
+        min_x, min_y = bound_p_list[0]
+        max_x, max_y = bound_p_list[1]
+        return (x <= max_x and x >= min_x and y <= max_y and y >= min_y)
 
 
 class MainWindow(QMainWindow):
@@ -366,6 +449,8 @@ class MainWindow(QMainWindow):
         # -------------------编辑--------------------
         translate_act.triggered.connect(self.translate_action)
         clip_cohen_sutherland_act.triggered.connect(self.clip_cohen_sutherland_action)
+        clip_liang_barsky_act.triggered.connect(self.clip_liang_barsky_action)
+        scale_act.triggered.connect(self.scale_action)
 
     def get_id(self):
         return str(self.item_cnt)
@@ -418,6 +503,15 @@ class MainWindow(QMainWindow):
     def clip_cohen_sutherland_action(self):
         self.statusBar().showMessage('Cohen-Sutherland算法裁剪')
         self.canvas_widget.start_clip_line('Cohen-Sutherland')
+    
+    def clip_liang_barsky_action(self):
+        self.statusBar().showMessage('Liang-Barsky算法裁剪')
+        self.canvas_widget.start_clip_line('Liang-Barsky')
+    
+    def scale_action(self):
+        self.statusBar().showMessage('缩放')
+        self.canvas_widget.start_scale_item()
+        
 
     def clear_canvas_action(self):
         """清空画布
@@ -455,7 +549,6 @@ class MainWindow(QMainWindow):
     
     def save_canvas_action(self):
         path = QFileDialog.getSaveFileName(parent=self, caption='保存画布',filter='Images(*.bmp)')
-        # path = file_dialog.getSaveFileName()
         logging.debug('Save canvas to {}'.format(path))
         image = self.canvas_widget.grab(self.canvas_widget.sceneRect().toRect())
         image.save(path[0])
