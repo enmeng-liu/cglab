@@ -154,21 +154,28 @@ class MyCanvas(QGraphicsView):
             self.scene().addItem(self.temp_item)
         elif self.status == 'translate':
             self.mouse_pos = [x,y]
+            self.setCursor(Qt.SizeAllCursor)
             if not self.temp_item.in_boundingRect(x,y):
                 self.status = ''
                 self.temp_item.selected = False
                 self.main_window.statusBar().showMessage('平移结束')
+                self.setCursor(Qt.ArrowCursor)
         elif self.status == 'clip':
             self.aux_item = MyItem('aux', 'aux_rect', [[x,y], [x,y]], '', QColor(255, 0, 0))
             self.scene().addItem(self.aux_item)
         elif self.status == 'scale':
             self.mouse_pos = [x,y]
             self.temp_item.center = self.temp_item.get_scale_center(x, y)
+            if self.temp_item.center == self.temp_item.p_list[0] or self.temp_item.center == self.temp_item.p_list[1]:
+                self.setCursor(Qt.SizeFDiagCursor)
+            else:
+                self.setCursor(Qt.SizeBDiagCursor)
             if not self.temp_item.center:
                 self.status = ''
                 self.temp_item.scale_flag = False
                 self.temp_item.selected = False
                 self.main_window.statusBar().showMessage('缩放结束')
+                self.setCursor(Qt.ArrowCursor)
         elif self.status == '':
             # 选择图元
             selected_items = self.items(x,y)
@@ -223,6 +230,7 @@ class MyCanvas(QGraphicsView):
             self.status = ''
         elif self.status == 'translate':
             self.main_window.statusBar().showMessage('平移完成')
+            self.setCursor(Qt.ArrowCursor)
             # self.status = ''
         elif self.status == 'clip':
             new_p_list = alg.clip(self.temp_item.p_list, self.aux_item.p_list[0][0], self.aux_item.p_list[0][1], self.aux_item.p_list[1][0], self.aux_item.p_list[1][1], self.temp_algorithm)
@@ -235,6 +243,7 @@ class MyCanvas(QGraphicsView):
             self.scene().removeItem(self.aux_item)
         elif self.status == 'scale':
             self.main_window.statusBar().showMessage('缩放完成')
+            self.setCursor(Qt.ArrowCursor)
             # self.status = ''
         self.updateScene([self.sceneRect()])
         super().mouseReleaseEvent(event)
