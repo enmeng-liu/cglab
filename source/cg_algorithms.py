@@ -162,7 +162,7 @@ def draw_curve(p_list, algorithm):
     :param algorithm: (string) 绘制使用的算法，包括'Bezier'和'B-spline'（三次均匀B样条曲线，曲线不必经过首末控制点）
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
-    logging.debug('Start to draw curve with {}'.format(p_list))
+    # logging.debug('Start to draw curve with {}'.format(p_list))
     result, points = [], []
     n = len(p_list) # 控制点个数
     if algorithm == 'Bezier':
@@ -279,7 +279,7 @@ def scale(p_list, x, y, s):
     result = []
     cx, cy = x * (1 - s), y * (1 - s)
     for [xx, yy] in p_list:
-        newx, newy =  (xx * s + cx), round(yy * s + cy)
+        newx, newy =  round(xx * s + cx), round(yy * s + cy)
         result.append([newx, newy])
     return result
 

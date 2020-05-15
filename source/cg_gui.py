@@ -73,6 +73,12 @@ class MyCanvas(QGraphicsView):
         self.temp_algorithm = ''
         self.temp_id = item_id
     
+    def start_draw_curve(self, algorithm, item_id):
+        self.status = 'curve'
+        self.temp_algorithm = algorithm
+        self.temp_id = item_id
+        self.temp_item = None
+    
     def start_translate_item(self):
         if(self.selected_id == ''):
             self.main_window.statusBar().showMessage('请选择待平移图元')
@@ -166,6 +172,12 @@ class MyCanvas(QGraphicsView):
             # 绘制椭圆
             self.temp_item = MyItem(self.temp_id, self.status, [[x,y], [x,y]], self.temp_algorithm, self.temp_pen_color)
             self.scene().addItem(self.temp_item)
+        elif self.status == 'curve':
+            if not self.temp_item:
+                self.temp_item = MyItem(self.temp_id, self.status, [[x,y]], self.temp_algorithm, self.temp_pen_color)
+                self.scene().addItem(self.temp_item)
+            else:
+                self.temp_item.p_list.append([x,y])
         elif self.status == 'translate':
             self.mouse_pos = [x,y]
             self.setCursor(Qt.SizeAllCursor)
@@ -180,6 +192,7 @@ class MyCanvas(QGraphicsView):
         elif self.status == 'scale':
             self.mouse_pos = [x,y]
             self.temp_item.center = self.temp_item.get_scale_center(x, y)
+            self.temp_p_list = self.temp_item.p_list
             if self.temp_item.center == self.temp_item.p_list[0] or self.temp_item.center == self.temp_item.p_list[1]:
                 self.setCursor(Qt.SizeFDiagCursor)
             else:
@@ -190,6 +203,7 @@ class MyCanvas(QGraphicsView):
                 self.temp_item.selected = False
                 self.main_window.statusBar().showMessage('缩放结束')
                 self.setCursor(Qt.ArrowCursor)
+                self.temp_p_list = []
         elif self.status == 'rotate':
             self.mouse_pos = [x, y]
             if self.temp_item.move_rotate_center(x, y):
@@ -233,8 +247,9 @@ class MyCanvas(QGraphicsView):
             self.aux_item.p_list[1] = [x,y]
             self.main_window.statusBar().showMessage('裁剪 %s：(%d, %d) - (%d, %d)' % (self.selected_id, self.aux_item.p_list[0][0], self.aux_item.p_list[0][1], x,y))
         elif self.status == 'scale':
-            self.temp_item.scale(x)
-            self.mouse_pos = [x,y]
+            x0 = self.temp_item.center[0]
+            s = abs((x - x0) / (self.mouse_pos[0] - x0))
+            self.temp_item.p_list = alg.scale(self.temp_p_list, x0, self.temp_item.center[1], s)
             self.main_window.statusBar().showMessage('缩放 %s: (%d, %d)' % (self.selected_id, x, y))
         elif self.status == 'rotate':
             x0, y0 = self.temp_item.center
@@ -246,7 +261,7 @@ class MyCanvas(QGraphicsView):
             if ax * by - ay * bx < 0:
                 radian = -radian
             self.temp_item.p_list = alg.rotate_by_radian(self.temp_p_list, x0, y0, radian)
-            self.main_window.statusBar().showMessage('旋转： 角度 %f' % (radian*180/math.pi))
+            self.main_window.statusBar().showMessage('旋转 %s： 角度 %f' % (self.temp_id, radian*180/math.pi))
         elif self.status == 'rotate_move_center':
             self.setCursor(Qt.OpenHandCursor)
             self.temp_item.center = [x, y]
@@ -254,6 +269,7 @@ class MyCanvas(QGraphicsView):
             self.main_window.statusBar().showMessage('空闲：(%d, %d)' % (x,y))
         self.updateScene([self.sceneRect()])
         super().mouseMoveEvent(event)
+
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         pos = self.mapToScene(event.localPos().toPoint())
         x = int(pos.x())
@@ -286,7 +302,7 @@ class MyCanvas(QGraphicsView):
         elif self.status == 'scale':
             self.main_window.statusBar().showMessage('缩放完成')
             self.setCursor(Qt.ArrowCursor)
-            # self.status = ''
+            self.mouse_pos = [x, y]
         elif self.status == 'rotate':
             self.main_window.statusBar().showMessage('旋转完成')
             self.setCursor(Qt.ArrowCursor)
@@ -310,6 +326,12 @@ class MyCanvas(QGraphicsView):
             self.scene().addItem(self.temp_item)
             self.item_dict[self.temp_id] = self.temp_item
             self.list_widget.addItem(self.temp_id +' ' + self.status)
+            self.finish_draw()
+            self.status = ''
+        elif self.status == 'curve':
+            self.main_window.statusBar().showMessage('曲线绘制完成')
+            self.list_widget.addItem(self.temp_id + ' ' + self.status)
+            self.item_dict[self.temp_id] = self.temp_item
             self.finish_draw()
             self.status = ''
         self.updateScene([self.sceneRect()])
@@ -387,7 +409,7 @@ class MyItem(QGraphicsItem):
             min_y = min(y0, y1)
             max_x = max(x0, x1)
             max_y = max(y0, y1)
-        elif self.item_type == 'polygon':
+        elif self.item_type == 'polygon' or self.item_type == 'curve':
             for [xx, yy] in self.p_list:
                 min_x, min_y, max_x, max_y = min(xx, min_x), min(yy, min_y), max(xx, max_x), max(yy, max_y)
         elif self.item_type == 'ellipse':
@@ -400,8 +422,6 @@ class MyItem(QGraphicsItem):
         elif self.item_type == 'aux_rect':
             min_x, min_y = self.p_list[0]
             max_x, max_y = self.p_list[1]
-        elif self.item_type == 'curve':
-            pass
         return [[min_x, min_y], [max_x, max_y]]
 
     def display_scale_vertex(self, painter):
@@ -432,10 +452,11 @@ class MyItem(QGraphicsItem):
             return [min_x, min_y]
         return []
     
-    def scale(self, new_x):
+    def scale(self, new_x, old_x):
         """根据横坐标增量进行缩放
         """
-        s = abs(new_x - self.center[0]) / (self.p_list[1][0] - self.p_list[0][0])
+        s = abs((new_x - self.center[0]) / (old_x - self.center[0]))
+        logging.debug('scale level = %f' % s)
         new_p_list = alg.scale(self.p_list, self.center[0], self.center[1], s)
         self.p_list = new_p_list
     
@@ -528,6 +549,7 @@ class MainWindow(QMainWindow):
         polygon_dda_act.triggered.connect(self.polygon_dda_action)
         polygon_bresenham_act.triggered.connect(self.polygon_bresenham_action)
         ellipse_act.triggered.connect(self.ellipse_action)
+        curve_bezier_act.triggered.connect(self.curve_bezier_action)
         self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed_from_list)
         # -------------------编辑--------------------
         translate_act.triggered.connect(self.translate_action)
@@ -578,6 +600,11 @@ class MainWindow(QMainWindow):
     def ellipse_action(self):
         self.canvas_widget.start_draw_ellipse(self.get_id())
         self.statusBar().showMessage('绘制椭圆')
+        self.canvas_widget.clear_selection()
+    
+    def curve_bezier_action(self):
+        self.statusBar().showMessage('Bezier算法绘制曲线')
+        self.canvas_widget.start_draw_curve('Bezier', self.get_id())
         self.canvas_widget.clear_selection()
     
     def translate_action(self):
