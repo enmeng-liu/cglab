@@ -1,7 +1,7 @@
 resetCanvas 1000 1000
 setColor 231 117 25
-drawLine l1 500 500 700 700 Bresenham
-translate l1 0 200
+drawPolygon p1 100 100 100 300 300 300 300 100 Bresenham
+rotate p1 300 300 540
 setColor 255 0 0 
-drawLine l2 500 500 700 700 Bresenham
+drawPolygon p2 100 100 100 300 300 300 300 100 Bresenham
 saveCanvas 1

@@ -60,9 +60,9 @@ if __name__ == '__main__':
             elif line[0] == 'drawPolygon':
                 item_id = line[1]
                 p_list = []
-                for i in range(1, len(line) - 1, 2):
+                for i in range(2, len(line) - 1, 2):
                     p_list.append([int(line[i]), int(line[i + 1])])
-                    logging.debug('append {}'.format(p_list[-1]))
+                    # logging.debug('append {}'.format(p_list[-1]))
                 algorithm = line[-1]
                 item_dict[item_id] = ['polygon', p_list, algorithm, np.array(pen_color)]
             elif line[0] == 'drawEllipse':

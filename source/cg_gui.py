@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 
-import sys, logging
+import sys, logging, math
 import cg_algorithms as alg
 from typing import Optional
 from PyQt5.QtWidgets import (
@@ -40,9 +40,10 @@ class MyCanvas(QGraphicsView):
         self.temp_id = ''
         self.temp_item = None
         self.temp_pen_color = QColor(0, 0, 0)
+        self.temp_p_list = [] # 初始状态， 用于旋转时防止累计误差
         self.polygon_cnt = 0
         self.mouse_pos = []
-        self.aux_item = None #辅助图元，用于裁剪等功能
+        self.aux_item = None # 辅助图元，用于裁剪等功能
     
     def delete_item(self, item_id):
         if(item_id == self.selected_id):
@@ -94,6 +95,19 @@ class MyCanvas(QGraphicsView):
         self.status = 'scale'
         self.temp_item = self.item_dict[self.selected_id]
         self.temp_item.scale_flag = True
+        self.updateScene([self.sceneRect()])
+    
+    def start_rotate_item(self):
+        if(self.selected_id == ''):
+            self.main_window.statusBar().showMessage('请选择待旋转图元')
+            return
+        self.status = 'rotate'
+        self.temp_item = self.item_dict[self.selected_id]
+        x0, y0 = self.temp_item.p_list[0]
+        x1, y1 = self.temp_item.p_list[1]
+        self.temp_item.center = self.temp_item.shape_center()
+        self.temp_item.rotate_flag = True
+        self.temp_p_list = self.temp_item.p_list
         self.updateScene([self.sceneRect()])
 
     def finish_draw(self):
@@ -176,6 +190,18 @@ class MyCanvas(QGraphicsView):
                 self.temp_item.selected = False
                 self.main_window.statusBar().showMessage('缩放结束')
                 self.setCursor(Qt.ArrowCursor)
+        elif self.status == 'rotate':
+            self.mouse_pos = [x, y]
+            if self.temp_item.move_rotate_center(x, y):
+                self.status = 'rotate_move_center'
+                self.setCursor(Qt.OpenHandCursor)
+            elif not self.temp_item.get_scale_center(x,y):
+                self.status = ''
+                self.temp_item.selected = False
+                self.temp_item.rotate_flag = False
+                self.temp_p_list = []
+                self.main_window.statusBar().showMessage('旋转结束')
+                self.setCursor(Qt.ArrowCursor)
         elif self.status == '':
             # 选择图元
             selected_items = self.items(x,y)
@@ -210,12 +236,28 @@ class MyCanvas(QGraphicsView):
             self.temp_item.scale(x)
             self.mouse_pos = [x,y]
             self.main_window.statusBar().showMessage('缩放 %s: (%d, %d)' % (self.selected_id, x, y))
+        elif self.status == 'rotate':
+            x0, y0 = self.temp_item.center
+            x1, y1 = self.mouse_pos
+            ax, ay, bx, by = x1-x0, y1-y0, x-x0, y-y0
+            a_norm = ax * ax + ay * ay
+            b_norm = bx * bx + by * by
+            radian = math.acos((a_norm + b_norm - (x-x1)*(x-x1) - (y-y1)*(y-y1))/(2 * math.sqrt(a_norm * b_norm)))
+            if ax * by - ay * bx < 0:
+                radian = -radian
+            self.temp_item.p_list = alg.rotate_by_radian(self.temp_p_list, x0, y0, radian)
+            self.main_window.statusBar().showMessage('旋转： 角度 %f' % (radian*180/math.pi))
+        elif self.status == 'rotate_move_center':
+            self.setCursor(Qt.OpenHandCursor)
+            self.temp_item.center = [x, y]
         elif self.status == '':
             self.main_window.statusBar().showMessage('空闲：(%d, %d)' % (x,y))
         self.updateScene([self.sceneRect()])
         super().mouseMoveEvent(event)
-
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        pos = self.mapToScene(event.localPos().toPoint())
+        x = int(pos.x())
+        y = int(pos.y())
         if self.status == 'line':
             self.item_dict[self.temp_id] = self.temp_item
             self.list_widget.addItem(self.temp_id + ' ' + self.status)
@@ -245,6 +287,13 @@ class MyCanvas(QGraphicsView):
             self.main_window.statusBar().showMessage('缩放完成')
             self.setCursor(Qt.ArrowCursor)
             # self.status = ''
+        elif self.status == 'rotate':
+            self.main_window.statusBar().showMessage('旋转完成')
+            self.setCursor(Qt.ArrowCursor)
+            self.mouse_pos = [x, y]
+        elif self.status == 'rotate_move_center':
+            self.setCursor(Qt.OpenHandCursor)
+            self.status = 'rotate'
         self.updateScene([self.sceneRect()])
         super().mouseReleaseEvent(event)
     
@@ -291,7 +340,9 @@ class MyItem(QGraphicsItem):
         self.selected = False
         self.color = color
         self.scale_flag = False
+        self.rotate_flag = False
         self.center = [] # 操作中心，用于缩放和旋转
+        self.sz = 16 # 缩放旋转辅助框的边长
         # logging.debug('create MyItem {} with p_list={}'.format(item_type, p_list))
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = ...) -> None:
@@ -319,7 +370,10 @@ class MyItem(QGraphicsItem):
             painter.setPen(pen)
             painter.drawRect(self.boundingRect())
             if self.scale_flag:
-                self.scale_vertex(painter)
+                self.display_scale_vertex(painter)
+            if self.rotate_flag:
+                self.display_scale_vertex(painter)
+                self.display_rotate_center(painter)
 
     def get_bound(self):
         """得到图元的左上角和右下角点的坐标
@@ -350,17 +404,16 @@ class MyItem(QGraphicsItem):
             pass
         return [[min_x, min_y], [max_x, max_y]]
 
-    def scale_vertex(self, painter):
+    def display_scale_vertex(self, painter):
         """给图元的外接矩形的顶点加上小矩形
         """
         bound_p_list = self.get_bound()
         min_x, min_y = bound_p_list[0]
         max_x, max_y = bound_p_list[1]
-        sz = 12
-        painter.drawRect(QRectF(min_x-sz/2, min_y-sz/2, sz, sz))
-        painter.drawRect(QRectF(min_x-sz/2, max_y-sz/2, sz, sz))
-        painter.drawRect(QRectF(max_x-sz/2, min_y-sz/2, sz, sz))
-        painter.drawRect(QRectF(max_x-sz/2, max_y-sz/2, sz, sz))
+        painter.drawRect(QRectF(min_x-self.sz/2, min_y-self.sz/2, self.sz, self.sz))
+        painter.drawRect(QRectF(min_x-self.sz/2, max_y-self.sz/2, self.sz, self.sz))
+        painter.drawRect(QRectF(max_x-self.sz/2, min_y-self.sz/2, self.sz, self.sz))
+        painter.drawRect(QRectF(max_x-self.sz/2, max_y-self.sz/2, self.sz, self.sz))
     
     def get_scale_center(self, x, y):
         """根据鼠标点击的位置返回缩放中心
@@ -368,7 +421,7 @@ class MyItem(QGraphicsItem):
         bound_p_list = self.get_bound()
         min_x, min_y = bound_p_list[0]
         max_x, max_y = bound_p_list[1]
-        half_sz = 6
+        half_sz = self.sz / 2
         if abs(x-min_x) <= half_sz and abs(y-min_y) <= half_sz:
             return [max_x, max_y]
         if abs(x-min_x) <= half_sz and abs(y-max_y) <= half_sz:
@@ -386,18 +439,39 @@ class MyItem(QGraphicsItem):
         new_p_list = alg.scale(self.p_list, self.center[0], self.center[1], s)
         self.p_list = new_p_list
     
+    def display_rotate_center(self, painter):
+        """显示旋转中心
+        """
+        x, y = self.center
+        painter.drawRect(QRectF(x-self.sz/2, y-self.sz/2, self.sz, self.sz))
+        painter.drawRect(QRectF(x, y, 1, 1))
+    
+    def move_rotate_center(self, x, y):
+        """根据鼠标点击位置是否需要判断平移旋转中心
+        """
+        if abs(x - self.center[0]) <= self.sz/2 and abs(y - self.center[1]) <= self.sz/2:
+            return True
+        return False
+    
     def boundingRect(self) -> QRectF:
         bound_p_list = self.get_bound()
         min_x, min_y = bound_p_list[0]
         max_x, max_y = bound_p_list[1]
         return QRectF(min_x-1,  min_y-1, max_x-min_x+2, max_y-min_y+2)
     
+    def shape_center(self):
+        """返回图元几何意义上的中心
+        """
+        bound_p_list = self.get_bound()
+        min_x, min_y = bound_p_list[0]
+        max_x, max_y = bound_p_list[1]
+        return [int((min_x+max_x)/2), int((min_y+max_y)/2)]
+    
     def in_boundingRect(self, x, y):
         bound_p_list = self.get_bound()
         min_x, min_y = bound_p_list[0]
         max_x, max_y = bound_p_list[1]
         return (x <= max_x and x >= min_x and y <= max_y and y >= min_y)
-
 
 class MainWindow(QMainWindow):
     """
@@ -460,6 +534,7 @@ class MainWindow(QMainWindow):
         clip_cohen_sutherland_act.triggered.connect(self.clip_cohen_sutherland_action)
         clip_liang_barsky_act.triggered.connect(self.clip_liang_barsky_action)
         scale_act.triggered.connect(self.scale_action)
+        rotate_act.triggered.connect(self.rotate_action)
 
     def get_id(self):
         return str(self.item_cnt)
@@ -520,7 +595,10 @@ class MainWindow(QMainWindow):
     def scale_action(self):
         self.statusBar().showMessage('缩放')
         self.canvas_widget.start_scale_item()
-        
+    
+    def rotate_action(self):
+        self.statusBar().showMessage('旋转')
+        self.canvas_widget.start_rotate_item()
 
     def clear_canvas_action(self):
         """清空画布

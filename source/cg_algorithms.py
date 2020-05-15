@@ -246,14 +246,25 @@ def rotate(p_list, x, y, r):
     :param r: (int) 顺时针旋转角度（°）
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 变换后的图元参数
     """
+    return rotate_by_radian(p_list, x, y, r*math.pi/180)
+
+def rotate_by_radian(p_list, x, y ,r):
+    """弧度制旋转变换（除椭圆外）
+
+    :param p_list: (list of list of int: [[x0, y0], [x1, y1], [x2, y2], ...]) 图元参数
+    :param x: (int) 旋转中心x坐标
+    :param y: (int) 旋转中心y坐标
+    :param r: (int) 顺时针旋转弧度
+    :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 变换后的图元参数
+    """
     result = []
-    sinr = math.sin(r * math.pi / 180)
-    cosr = math.cos(r * math.pi / 180)
+    sinr = math.sin(r)
+    cosr = math.cos(r)
     for [xx,yy] in p_list:
         newx = x + (xx - x) * cosr - (yy - y) * sinr
         newy = y + (xx - x) * sinr + (yy - y) * cosr
         result.append([round(newx), round(newy)])
-        logging.debug('rotate {} to {}'.format([xx, yy], result[-1]))
+        # logging.debug('rotate {} to {}'.format([xx, yy], result[-1]))
     return result
 
 
@@ -268,7 +279,7 @@ def scale(p_list, x, y, s):
     result = []
     cx, cy = x * (1 - s), y * (1 - s)
     for [xx, yy] in p_list:
-        newx, newy = round(xx * s + cx), round(yy * s + cy)
+        newx, newy =  (xx * s + cx), round(yy * s + cy)
         result.append([newx, newy])
     return result
 
