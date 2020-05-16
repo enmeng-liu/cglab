@@ -184,7 +184,7 @@ def draw_curve(p_list, algorithm):
     elif algorithm == 'B-spline':
         k = 4 #阶数
         if n < k:
-            print('Not enough control points.')
+            # print('Not enough control points.')
             return []
         # 计算节点矢量
         U = []

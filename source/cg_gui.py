@@ -175,6 +175,7 @@ class MyCanvas(QGraphicsView):
         elif self.status == 'curve':
             if not self.temp_item:
                 self.temp_item = MyItem(self.temp_id, self.status, [[x,y]], self.temp_algorithm, self.temp_pen_color)
+                self.temp_item.drawing = True
                 self.scene().addItem(self.temp_item)
             else:
                 self.temp_item.p_list.append([x,y])
@@ -334,6 +335,7 @@ class MyCanvas(QGraphicsView):
             self.item_dict[self.temp_id] = self.temp_item
             self.finish_draw()
             self.status = ''
+            self.temp_item.drawing = False
         self.updateScene([self.sceneRect()])
         super().mouseDoubleClickEvent(event)
 
@@ -363,6 +365,7 @@ class MyItem(QGraphicsItem):
         self.color = color
         self.scale_flag = False
         self.rotate_flag = False
+        self.drawing = False
         self.center = [] # 操作中心，用于缩放和旋转
         self.sz = 16 # 缩放旋转辅助框的边长
         # logging.debug('create MyItem {} with p_list={}'.format(item_type, p_list))
@@ -375,18 +378,21 @@ class MyItem(QGraphicsItem):
             'curve': alg.draw_curve,
             'aux_rect': alg.draw_rect
         }
+        pen = QPen()
         item_pixels = draw_dict[self.item_type](self.p_list, self.algorithm)
         for p in item_pixels:
             if self.item_type != 'aux_rect':
                 painter.setPen(self.color) 
             else:
-                pen = QPen()
                 pen.setStyle(Qt.DashLine)
                 pen.setBrush(Qt.red)
                 painter.setPen(pen)
             painter.drawPoint(*p)
+        if self.item_type == 'curve' and (self.drawing or self.selected):
+            pen.setBrush(Qt.blue)
+            painter.setPen(pen)
+            self.display_control_points(painter)
         if self.selected:
-            pen = QPen()
             pen.setStyle(Qt.DashLine)
             pen.setBrush(Qt.red)
             painter.setPen(pen)
@@ -474,6 +480,12 @@ class MyItem(QGraphicsItem):
             return True
         return False
     
+    def display_control_points(self, painter):
+        if self.item_type != 'curve':
+            return
+        for [x, y] in self.p_list:
+            painter.drawRect(QRectF(x-self.sz/2, y-self.sz/2, self.sz, self.sz))
+    
     def boundingRect(self) -> QRectF:
         bound_p_list = self.get_bound()
         min_x, min_y = bound_p_list[0]
@@ -550,6 +562,7 @@ class MainWindow(QMainWindow):
         polygon_bresenham_act.triggered.connect(self.polygon_bresenham_action)
         ellipse_act.triggered.connect(self.ellipse_action)
         curve_bezier_act.triggered.connect(self.curve_bezier_action)
+        curve_b_spline_act.triggered.connect(self.curve_b_spline_action)
         self.list_widget.currentTextChanged.connect(self.canvas_widget.selection_changed_from_list)
         # -------------------编辑--------------------
         translate_act.triggered.connect(self.translate_action)
@@ -603,8 +616,13 @@ class MainWindow(QMainWindow):
         self.canvas_widget.clear_selection()
     
     def curve_bezier_action(self):
-        self.statusBar().showMessage('Bezier算法绘制曲线')
+        self.statusBar().showMessage('Bezier曲线绘制')
         self.canvas_widget.start_draw_curve('Bezier', self.get_id())
+        self.canvas_widget.clear_selection()
+    
+    def curve_b_spline_action(self):
+        self.statusBar().showMessage('三次B样条曲线绘制')
+        self.canvas_widget.start_draw_curve('B-spline', self.get_id())
         self.canvas_widget.clear_selection()
     
     def translate_action(self):
