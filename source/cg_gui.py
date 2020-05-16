@@ -35,7 +35,6 @@ class MyCanvas(QGraphicsView):
         self.list_widget = None
         self.item_dict = {}
         self.selected_id = ''
-
         self.status = ''
         self.temp_algorithm = ''
         self.temp_id = ''
@@ -59,6 +58,23 @@ class MyCanvas(QGraphicsView):
         self.temp_item = ''
         self.status = 'deleted' 
         self.main_window.list_widget.setCurrentItem(None)
+
+    def clear_all(self):
+        item_list = list(self.item_dict.keys())
+        for item_id in item_list:
+            self.selected_id = item_id
+            self.delete_selected_item()
+        self.updateScene([self.sceneRect()])
+        self.item_dict = {}
+        self.selected_id = self.temp_algorithm = ''
+        self.item_dict = {}
+        self.selected_id = self.status = self.temp_algorithm = self.temp_id = ''
+        self.temp_item = None
+        self.temp_pen_color = QColor(0, 0, 0)
+        self.temp_p_list = [] # 初始状态， 用于旋转时防止累计误差
+        self.polygon_cnt = 0
+        self.mouse_pos = []
+        self.aux_item = None # 辅助图元，用于裁剪等功能
 
     def start_draw_line(self, algorithm, item_id):
         self.status = 'line'
@@ -118,14 +134,24 @@ class MyCanvas(QGraphicsView):
         self.updateScene([self.sceneRect()])
 
     def finish_draw(self):
+        self.item_dict[self.temp_id] = self.temp_item
+        self.temp_item.list_item = QListWidgetItem(self.temp_id + ' ' + self.status)
+        self.list_widget.addItem(self.temp_item.list_item)
         self.temp_id = self.main_window.new_id()
+    
+    def finish_edit(self):
+        self.status = ''
+        self.temp_item.scale_flag = self.temp_item.rotate_flag = self.temp_item.selected = False
+        self.setCursor(Qt.ArrowCursor)
+        self.temp_p_list = []
+        self.selected_id = ''
 
     def clear_selection(self):
         if self.selected_id != '':
-            # self.main_window.list_widget.clearSelection()
             self.main_window.list_widget.setCurrentItem(None)
             self.item_dict[self.selected_id].selected = False
             self.selected_id = ''
+            self.updateScene([self.sceneRect()])  
 
     def selection_changed_from_list(self, selected):
         if selected == '' or self.status == 'deleted':
@@ -184,10 +210,8 @@ class MyCanvas(QGraphicsView):
             self.mouse_pos = [x,y]
             self.setCursor(Qt.SizeAllCursor)
             if not self.temp_item.in_boundingRect(x,y):
-                self.status = ''
-                self.temp_item.selected = False
+                self.finish_edit()
                 self.main_window.statusBar().showMessage('平移结束')
-                self.setCursor(Qt.ArrowCursor)
         elif self.status == 'clip':
             self.aux_item = MyItem('aux', 'aux_rect', [[x,y], [x,y]], '', QColor(255, 0, 0))
             self.scene().addItem(self.aux_item)
@@ -200,24 +224,16 @@ class MyCanvas(QGraphicsView):
             else:
                 self.setCursor(Qt.SizeBDiagCursor)
             if not self.temp_item.center:
-                self.status = ''
-                self.temp_item.scale_flag = False
-                self.temp_item.selected = False
+                self.finish_edit()
                 self.main_window.statusBar().showMessage('缩放结束')
-                self.setCursor(Qt.ArrowCursor)
-                self.temp_p_list = []
         elif self.status == 'rotate':
             self.mouse_pos = [x, y]
             if self.temp_item.move_rotate_center(x, y):
                 self.status = 'rotate_move_center'
                 self.setCursor(Qt.OpenHandCursor)
             elif not self.temp_item.get_scale_center(x,y):
-                self.status = ''
-                self.temp_item.selected = False
-                self.temp_item.rotate_flag = False
-                self.temp_p_list = []
+                self.finish_edit()
                 self.main_window.statusBar().showMessage('旋转结束')
-                self.setCursor(Qt.ArrowCursor)
         elif self.status == '':
             # 选择图元
             selected_items = self.items(x,y)
@@ -277,19 +293,11 @@ class MyCanvas(QGraphicsView):
         x = int(pos.x())
         y = int(pos.y())
         if self.status == 'line':
-            self.item_dict[self.temp_id] = self.temp_item
-            self.temp_item.list_item = QListWidgetItem(self.temp_id + ' ' + self.status)
-            self.list_widget.addItem(self.temp_item.list_item)
-            # self.list_widget.addItem(self.temp_id + ' ' + self.status)
             self.finish_draw()
             self.status = ''
         elif self.status == 'polygon':
             pass
         elif self.status == 'ellipse':
-            self.item_dict[self.temp_id] = self.temp_item
-            self.temp_item.list_item = QListWidgetItem(self.temp_id + ' ' + self.status)
-            self.list_widget.addItem(self.temp_item.list_item)
-            # self.list_widget.addItem(self.temp_id + ' ' +  self.status)
             self.finish_draw()
             self.status = ''
         elif self.status == 'translate':
@@ -330,18 +338,10 @@ class MyCanvas(QGraphicsView):
                 self.scene().removeItem(line_item)
             self.temp_item = MyItem(self.temp_id, 'polygon', p_list, self.temp_algorithm, self.temp_pen_color)
             self.scene().addItem(self.temp_item)
-            self.item_dict[self.temp_id] = self.temp_item
-            self.temp_item.list_item = QListWidgetItem(self.temp_id + ' ' + self.status)
-            self.list_widget.addItem(self.temp_item.list_item)
-            # self.list_widget.addItem(self.temp_id +' ' + self.status)
             self.finish_draw()
             self.status = ''
         elif self.status == 'curve':
             self.main_window.statusBar().showMessage('曲线绘制完成')
-            self.temp_item.list_item = QListWidgetItem(self.temp_id + ' ' + self.status)
-            self.list_widget.addItem(self.temp_item.list_item)
-            # self.list_widget.addItem(self.temp_id + ' ' + self.status)
-            self.item_dict[self.temp_id] = self.temp_item
             self.finish_draw()
             self.status = ''
             self.temp_item.drawing = False
@@ -603,44 +603,44 @@ class MainWindow(QMainWindow):
             # logging.debug('set pen color to {}'.format(color))git
 
     def line_naive_action(self):
+        self.canvas_widget.clear_selection()
         self.canvas_widget.start_draw_line('Naive', self.get_id())
         self.statusBar().showMessage('Naive算法绘制线段')
-        self.canvas_widget.clear_selection()
 
     def line_dda_action(self):
+        self.canvas_widget.clear_selection()
         self.canvas_widget.start_draw_line('DDA', self.get_id())
         self.statusBar().showMessage('DDA算法绘制线段')
-        self.canvas_widget.clear_selection()
     
     def line_bresenham_action(self):
+        self.canvas_widget.clear_selection()
         self.canvas_widget.start_draw_line('Bresenham', self.get_id())
         self.statusBar().showMessage('Bresenham算法绘制线段')
-        self.canvas_widget.clear_selection()
 
     def polygon_dda_action(self):
+        self.canvas_widget.clear_selection()
         self.canvas_widget.start_draw_polygon('DDA', self.get_id())
         self.statusBar().showMessage('DDA算法绘制多边形')
-        self.canvas_widget.clear_selection()
     
     def polygon_bresenham_action(self):
+        self.canvas_widget.clear_selection()
         self.canvas_widget.start_draw_polygon('Bresenham', self.get_id())
         self.statusBar().showMessage('Bresenham算法绘制多边形')
-        self.canvas_widget.clear_selection()
     
     def ellipse_action(self):
+        self.canvas_widget.clear_selection()
         self.canvas_widget.start_draw_ellipse(self.get_id())
         self.statusBar().showMessage('绘制椭圆')
-        self.canvas_widget.clear_selection()
     
     def curve_bezier_action(self):
+        self.canvas_widget.clear_selection()
         self.statusBar().showMessage('Bezier曲线绘制')
         self.canvas_widget.start_draw_curve('Bezier', self.get_id())
-        self.canvas_widget.clear_selection()
     
     def curve_b_spline_action(self):
+        self.canvas_widget.clear_selection()
         self.statusBar().showMessage('三次B样条曲线绘制')
         self.canvas_widget.start_draw_curve('B-spline', self.get_id())
-        self.canvas_widget.clear_selection()
     
     def translate_action(self):
         self.statusBar().showMessage('平移')
@@ -670,13 +670,13 @@ class MainWindow(QMainWindow):
         """清空画布
         """
         self.canvas_widget.resetCachedContent()
-        for item_id in range(0, self.item_cnt-1):
-            del self.canvas_widget.item_dict[str(item_id)]
-            logging.debug('delete item %d' % item_id)
+        # for item_id in range(0, self.item_cnt-1):
+        #     del self.canvas_widget.item_dict[str(item_id)]
+        self.canvas_widget.clear_all()
+        self.statusBar().showMessage('清空画布')
         self.item_cnt = 0
     
     def reset_canvas_action(self):
-        self.clear_canvas_action()
         while True:
             width, ok = QInputDialog.getInt(self, '重置画布', '请输入画布宽度：（单位：像素）')
             if ok and width <= 1000 and width >= 100:
@@ -684,7 +684,7 @@ class MainWindow(QMainWindow):
                 logging.debug('set width to {}'.format(self.width))
                 break
             elif not ok: 
-                break
+                return
         while True:
             height, ok = QInputDialog.getInt(self, '重置画布', '请输入画布高度：（单位：像素）')
             if ok and height <= 1000 and height >= 100:
@@ -692,7 +692,8 @@ class MainWindow(QMainWindow):
                 logging.debug('set height to {}'.format(self.height))
                 break
             elif not ok: 
-                break
+                return
+        self.clear_canvas_action()
         del self.scene
         del self.canvas_widget
         del self.hbox_layout
@@ -729,7 +730,6 @@ class MainWindow(QMainWindow):
         self.resize(self.width, self.height)
         self.setWindowTitle('CG Demo')
         
-
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
