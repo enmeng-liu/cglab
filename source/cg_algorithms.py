@@ -334,7 +334,7 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
     """
     result = []
     [x0, y0], [x1, y1] = p_list
-    logging.debug('Start to clip {} with ({},{}) to ({},{})'.format(p_list, x_min, y_min, x_max, y_max))
+    # logging.debug('Start to clip {} with ({},{}) to ({},{})'.format(p_list, x_min, y_min, x_max, y_max))
     if x_min > x_max or y_min > y_max:
         return p_list
     if algorithm == 'Cohen-Sutherland':
@@ -370,7 +370,7 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
                 # logging.debug('clip to ({}, {})-({}, {})'.format(x0, y0, x1, y1))
         if accept:
             result = [[round(x0), round(y0)], [round(x1), round(y1)]]
-        logging.debug('C-S clip get {}'.format(result))
+        # logging.debug('C-S clip get {}'.format(result))
         return result
     elif algorithm == 'Liang-Barsky':
         tl, tu = 0, 1
@@ -379,7 +379,6 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
         visible, tl, tu = clipt(dx, x_max-x0, tl, tu)
         visible, tl, tu = clipt(-dy, y0-y_min, tl, tu) 
         visible, tl, tu = clipt(dy, y_max-y0, tl, tu)
-        logging.debug("tl={}, tu={}".format(tl, tu))
         if tu < 1:
             x1, y1 = x0+tu*dx, y0+tu*dy
         if tl > 0:

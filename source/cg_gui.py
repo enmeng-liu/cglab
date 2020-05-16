@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
     QGraphicsView,
     QGraphicsItem,
     QListWidget,
+    QListWidgetItem,
     QHBoxLayout,
     QWidget,
     QColorDialog,
@@ -45,28 +46,30 @@ class MyCanvas(QGraphicsView):
         self.mouse_pos = []
         self.aux_item = None # 辅助图元，用于裁剪等功能
     
-    def delete_item(self, item_id):
-        if(item_id == self.selected_id):
-            self.selected_id = ''
-        self.scene().removeItem(self.item_dict[item_id])
+    def delete_selected_item(self):
+        if not self.selected_id:
+            return
+        item_to_delete = self.item_dict[self.selected_id]
+        self.main_window.statusBar().showMessage('删除图元：' + self.selected_id + ' ' + item_to_delete.item_type)
+        del self.item_dict[self.selected_id]
+        self.scene().removeItem(item_to_delete)
         self.updateScene([self.sceneRect()])
-        item_list = self.main_window.list_widget.findItems(item_id + ' ' + self.item_dict[item_id].item_type, Qt.MatchExactly)
-        self.main_window.list_widget.removeItemWidget(item_list[0])
-        del self.item_dict[item_id]
-        
+        self.main_window.list_widget.takeItem(self.main_window.list_widget.row(item_to_delete.list_item))
+        self.selected_id = ''
+        self.temp_item = ''
+        self.status = 'deleted' 
+        self.main_window.list_widget.setCurrentItem(None)
 
     def start_draw_line(self, algorithm, item_id):
         self.status = 'line'
         self.temp_algorithm = algorithm
         self.temp_id = item_id
-        # logging.debug('draw line with color: {}'.format(self.temp_pen_color))
-    
+
     def start_draw_polygon(self, algorithm, item_id):
         self.status = 'polygon'
         self.temp_algorithm = algorithm
         self.temp_id = item_id
         self.item_dict[self.temp_id] = []
-        # logging.debug('start draw polygon.')
 
     def start_draw_ellipse(self, item_id):
         self.status = 'ellipse'
@@ -109,8 +112,6 @@ class MyCanvas(QGraphicsView):
             return
         self.status = 'rotate'
         self.temp_item = self.item_dict[self.selected_id]
-        x0, y0 = self.temp_item.p_list[0]
-        x1, y1 = self.temp_item.p_list[1]
         self.temp_item.center = self.temp_item.shape_center()
         self.temp_item.rotate_flag = True
         self.temp_p_list = self.temp_item.p_list
@@ -127,27 +128,27 @@ class MyCanvas(QGraphicsView):
             self.selected_id = ''
 
     def selection_changed_from_list(self, selected):
-        if selected == '':
+        if selected == '' or self.status == 'deleted':
+            self.status = ''
             return
-        logging.debug('select ' + selected)
         i = 0
         while selected[i].isdigit():
             i += 1
         selected_id = selected[0:i]
-        logging.debug('selected id = ' + selected_id)
         self.selection_changed_by_id(selected_id)
 
     def selection_changed_by_id(self, selected_id):
         if selected_id == '':
             return
-        # logging.debug('select ' + selected_id)
-        self.main_window.statusBar().showMessage('图元选择： %s' % selected_id)
         if self.selected_id != '':
+            if self.selected_id not in self.item_dict:
+                logging.debug('selected_id=%s not in item_dict' % self.selected_id)
+                return
             self.item_dict[self.selected_id].selected = False
-            self.item_dict[self.selected_id].update()
         self.selected_id = selected_id
         self.item_dict[selected_id].selected = True
         self.item_dict[selected_id].update()
+        self.main_window.list_widget.setCurrentItem(self.item_dict[selected_id].list_item)
         self.status = ''
         self.updateScene([self.sceneRect()])    
 
@@ -277,14 +278,18 @@ class MyCanvas(QGraphicsView):
         y = int(pos.y())
         if self.status == 'line':
             self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id + ' ' + self.status)
+            self.temp_item.list_item = QListWidgetItem(self.temp_id + ' ' + self.status)
+            self.list_widget.addItem(self.temp_item.list_item)
+            # self.list_widget.addItem(self.temp_id + ' ' + self.status)
             self.finish_draw()
             self.status = ''
         elif self.status == 'polygon':
             pass
         elif self.status == 'ellipse':
             self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id + ' ' +  self.status)
+            self.temp_item.list_item = QListWidgetItem(self.temp_id + ' ' + self.status)
+            self.list_widget.addItem(self.temp_item.list_item)
+            # self.list_widget.addItem(self.temp_id + ' ' +  self.status)
             self.finish_draw()
             self.status = ''
         elif self.status == 'translate':
@@ -294,7 +299,7 @@ class MyCanvas(QGraphicsView):
         elif self.status == 'clip':
             new_p_list = alg.clip(self.temp_item.p_list, self.aux_item.p_list[0][0], self.aux_item.p_list[0][1], self.aux_item.p_list[1][0], self.aux_item.p_list[1][1], self.temp_algorithm)
             if not new_p_list:
-                self.delete_item(self.selected_id)
+                self.delete_selected_item()
             else:
                 self.temp_item.p_list = new_p_list
             self.main_window.statusBar().showMessage('裁剪完成')
@@ -326,12 +331,16 @@ class MyCanvas(QGraphicsView):
             self.temp_item = MyItem(self.temp_id, 'polygon', p_list, self.temp_algorithm, self.temp_pen_color)
             self.scene().addItem(self.temp_item)
             self.item_dict[self.temp_id] = self.temp_item
-            self.list_widget.addItem(self.temp_id +' ' + self.status)
+            self.temp_item.list_item = QListWidgetItem(self.temp_id + ' ' + self.status)
+            self.list_widget.addItem(self.temp_item.list_item)
+            # self.list_widget.addItem(self.temp_id +' ' + self.status)
             self.finish_draw()
             self.status = ''
         elif self.status == 'curve':
             self.main_window.statusBar().showMessage('曲线绘制完成')
-            self.list_widget.addItem(self.temp_id + ' ' + self.status)
+            self.temp_item.list_item = QListWidgetItem(self.temp_id + ' ' + self.status)
+            self.list_widget.addItem(self.temp_item.list_item)
+            # self.list_widget.addItem(self.temp_id + ' ' + self.status)
             self.item_dict[self.temp_id] = self.temp_item
             self.finish_draw()
             self.status = ''
@@ -368,6 +377,7 @@ class MyItem(QGraphicsItem):
         self.drawing = False
         self.center = [] # 操作中心，用于缩放和旋转
         self.sz = 16 # 缩放旋转辅助框的边长
+        self.list_item = None
         # logging.debug('create MyItem {} with p_list={}'.format(item_type, p_list))
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = ...) -> None:
@@ -402,6 +412,9 @@ class MyItem(QGraphicsItem):
             if self.rotate_flag:
                 self.display_scale_vertex(painter)
                 self.display_rotate_center(painter)
+    
+    def __repr__(self):
+        return self.id + ' ' + self.item_type
 
     def get_bound(self):
         """得到图元的左上角和右下角点的坐标
@@ -462,7 +475,7 @@ class MyItem(QGraphicsItem):
         """根据横坐标增量进行缩放
         """
         s = abs((new_x - self.center[0]) / (old_x - self.center[0]))
-        logging.debug('scale level = %f' % s)
+        # logging.debug('scale level = %f' % s)
         new_p_list = alg.scale(self.p_list, self.center[0], self.center[1], s)
         self.p_list = new_p_list
     
@@ -485,6 +498,7 @@ class MyItem(QGraphicsItem):
             return
         for [x, y] in self.p_list:
             painter.drawRect(QRectF(x-self.sz/2, y-self.sz/2, self.sz, self.sz))
+            painter.drawRect(QRectF(x, y, 1, 1))
     
     def boundingRect(self) -> QRectF:
         bound_p_list = self.get_bound()
@@ -546,6 +560,8 @@ class MainWindow(QMainWindow):
         clip_menu = edit_menu.addMenu('裁剪')
         clip_cohen_sutherland_act = clip_menu.addAction('Cohen-Sutherland')
         clip_liang_barsky_act = clip_menu.addAction('Liang-Barsky')
+        delete_act = edit_menu.addAction('删除')
+        delete_act.setShortcut('delete')
 
         # 连接信号和槽函数
         #-------------------文件--------------------
@@ -570,6 +586,7 @@ class MainWindow(QMainWindow):
         clip_liang_barsky_act.triggered.connect(self.clip_liang_barsky_action)
         scale_act.triggered.connect(self.scale_action)
         rotate_act.triggered.connect(self.rotate_action)
+        delete_act.triggered.connect(self.delete_action)
 
     def get_id(self):
         return str(self.item_cnt)
@@ -644,6 +661,10 @@ class MainWindow(QMainWindow):
     def rotate_action(self):
         self.statusBar().showMessage('旋转')
         self.canvas_widget.start_rotate_item()
+    
+    def delete_action(self):
+        self.canvas_widget.delete_selected_item()
+        self.canvas_widget.clear_selection()
 
     def clear_canvas_action(self):
         """清空画布
