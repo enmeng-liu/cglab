@@ -1,7 +1,5 @@
 resetCanvas 1000 1000
 setColor 231 117 25
-drawPolygon p1 100 100 100 300 300 300 300 100 Bresenham
-rotate p1 300 300 540
-setColor 255 0 0 
-drawPolygon p2 100 100 100 300 300 300 300 100 Bresenham
+drawLine l1 100 100 400 400 Bresenham
+clip l1 500 500 700 700 Liang-Barsky
 saveCanvas 1

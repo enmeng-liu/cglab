@@ -150,8 +150,13 @@ class MyCanvas(QGraphicsView):
         if self.selected_id != '':
             self.main_window.list_widget.setCurrentItem(None)
             self.item_dict[self.selected_id].selected = False
+            temp_item = self.item_dict[self.selected_id]
+            temp_item.cancel()
             self.selected_id = ''
             self.updateScene([self.sceneRect()])  
+        if self.temp_item:
+            self.temp_item.cancel()
+        self.updateScene([self.sceneRect()])   
 
     def selection_changed_from_list(self, selected):
         if selected == '' or self.status == 'deleted':
@@ -168,7 +173,6 @@ class MyCanvas(QGraphicsView):
             return
         if self.selected_id != '':
             if self.selected_id not in self.item_dict:
-                logging.debug('selected_id=%s not in item_dict' % self.selected_id)
                 return
             self.item_dict[self.selected_id].selected = False
         self.selected_id = selected_id
@@ -228,6 +232,8 @@ class MyCanvas(QGraphicsView):
                 self.main_window.statusBar().showMessage('缩放结束')
         elif self.status == 'rotate':
             self.mouse_pos = [x, y]
+            self.setCursor(Qt.ArrowCursor)
+            self.temp_p_list = self.temp_item.p_list
             if self.temp_item.move_rotate_center(x, y):
                 self.status = 'rotate_move_center'
                 self.setCursor(Qt.OpenHandCursor)
@@ -279,7 +285,7 @@ class MyCanvas(QGraphicsView):
             if ax * by - ay * bx < 0:
                 radian = -radian
             self.temp_item.p_list = alg.rotate_by_radian(self.temp_p_list, x0, y0, radian)
-            self.main_window.statusBar().showMessage('旋转 %s： 角度 %f' % (self.temp_id, radian*180/math.pi))
+            self.main_window.statusBar().showMessage('旋转 %s： 角度 %f' % (self.selected_id, radian*180/math.pi))
         elif self.status == 'rotate_move_center':
             self.setCursor(Qt.OpenHandCursor)
             self.temp_item.center = [x, y]
@@ -324,6 +330,7 @@ class MyCanvas(QGraphicsView):
         elif self.status == 'rotate_move_center':
             self.setCursor(Qt.OpenHandCursor)
             self.status = 'rotate'
+            self.mouse_pos = [x, y]
         self.updateScene([self.sceneRect()])
         super().mouseReleaseEvent(event)
     
@@ -378,7 +385,6 @@ class MyItem(QGraphicsItem):
         self.center = [] # 操作中心，用于缩放和旋转
         self.sz = 16 # 缩放旋转辅助框的边长
         self.list_item = None
-        # logging.debug('create MyItem {} with p_list={}'.format(item_type, p_list))
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = ...) -> None:
         draw_dict = {
@@ -415,6 +421,15 @@ class MyItem(QGraphicsItem):
     
     def __repr__(self):
         return self.id + ' ' + self.item_type
+
+    def cancel(self):
+        """取消一切选中状态
+        """
+        self.selected = False
+        self.scale_flag = False
+        self.rotate_flag = False
+        self.drawing = False
+        self.center = [] # 操作中心，用于缩放和旋转
 
     def get_bound(self):
         """得到图元的左上角和右下角点的坐标
@@ -475,7 +490,6 @@ class MyItem(QGraphicsItem):
         """根据横坐标增量进行缩放
         """
         s = abs((new_x - self.center[0]) / (old_x - self.center[0]))
-        # logging.debug('scale level = %f' % s)
         new_p_list = alg.scale(self.p_list, self.center[0], self.center[1], s)
         self.p_list = new_p_list
     
@@ -600,7 +614,6 @@ class MainWindow(QMainWindow):
         color = QColorDialog.getColor()
         if color.isValid():
             self.canvas_widget.temp_pen_color = color
-            # logging.debug('set pen color to {}'.format(color))git
 
     def line_naive_action(self):
         self.canvas_widget.clear_selection()
@@ -681,7 +694,6 @@ class MainWindow(QMainWindow):
             width, ok = QInputDialog.getInt(self, '重置画布', '请输入画布宽度：（单位：像素）')
             if ok and width <= 1000 and width >= 100:
                 self.width = width
-                logging.debug('set width to {}'.format(self.width))
                 break
             elif not ok: 
                 return
@@ -689,7 +701,6 @@ class MainWindow(QMainWindow):
             height, ok = QInputDialog.getInt(self, '重置画布', '请输入画布高度：（单位：像素）')
             if ok and height <= 1000 and height >= 100:
                 self.height = height
-                logging.debug('set height to {}'.format(self.height))
                 break
             elif not ok: 
                 return
@@ -703,7 +714,6 @@ class MainWindow(QMainWindow):
     
     def save_canvas_action(self):
         path = QFileDialog.getSaveFileName(parent=self, caption='保存画布',filter='Images(*.bmp)')
-        logging.debug('Save canvas to {}'.format(path))
         image = self.canvas_widget.grab(self.canvas_widget.sceneRect().toRect())
         image.save(path[0])
     
@@ -728,11 +738,11 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.statusBar().showMessage('新画布：({}*{})'.format(self.height, self.width))
         self.resize(self.width, self.height)
-        self.setWindowTitle('CG Demo')
+        self.setWindowTitle('Mengzelev Painter')
         
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.WARNING)
     app = QApplication(sys.argv)
     mw = MainWindow()
     mw.show()

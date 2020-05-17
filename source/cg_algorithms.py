@@ -376,9 +376,18 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
         tl, tu = 0, 1
         dx, dy = x1 - x0, y1 - y0
         visible, tl, tu = clipt(-dx, x0-x_min, tl, tu)
+        if visible == False:
+            return []
         visible, tl, tu = clipt(dx, x_max-x0, tl, tu)
+        if visible == False:
+            return []
         visible, tl, tu = clipt(-dy, y0-y_min, tl, tu) 
+        if visible == False:
+            return []
         visible, tl, tu = clipt(dy, y_max-y0, tl, tu)
+        if visible == False:
+            return []
+        # logging.debug('visible=%d, tl=%f, tu=%f' % (visible, tl, tu))
         if tu < 1:
             x1, y1 = x0+tu*dx, y0+tu*dy
         if tl > 0:

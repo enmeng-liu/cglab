@@ -10,7 +10,7 @@ from PIL import Image
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level = logging.DEBUG)
+    logging.basicConfig(level = logging.WARNING)
     input_file = sys.argv[1]
     output_dir = sys.argv[2]
     os.makedirs(output_dir, exist_ok=True)
@@ -62,7 +62,6 @@ if __name__ == '__main__':
                 p_list = []
                 for i in range(2, len(line) - 1, 2):
                     p_list.append([int(line[i]), int(line[i + 1])])
-                    # logging.debug('append {}'.format(p_list[-1]))
                 algorithm = line[-1]
                 item_dict[item_id] = ['polygon', p_list, algorithm, np.array(pen_color)]
             elif line[0] == 'drawEllipse':
