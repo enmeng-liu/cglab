@@ -1,5 +1,0 @@
-resetCanvas 1000 1000
-setColor 231 117 25
-drawLine l1 100 100 400 400 Bresenham
-clip l1 500 500 700 700 Liang-Barsky
-saveCanvas 1

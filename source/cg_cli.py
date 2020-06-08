@@ -91,7 +91,7 @@ if __name__ == '__main__':
             elif line[0] == 'scale':
                 item_id = line[1]
                 item_type, p_list, algorithm, color = item_dict[item_id]
-                p_list = alg.scale(p_list, int(line[2]), int(line[3]), int(line[4]))
+                p_list = alg.scale(p_list, int(line[2]), int(line[3]), float(line[4]))
                 item_dict[item_id] = item_type, p_list, algorithm, color
             elif line[0] == 'clip':
                 item_id = line[1]

@@ -4,6 +4,7 @@
 # 本文件只允许依赖math库
 import math
 import logging
+import collections
 
 
 def draw_line(p_list, algorithm):
@@ -398,3 +399,4 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
     else:
         print('Invalid algorithm: ' + algorithm)
     return result
+

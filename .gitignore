@@ -4,3 +4,6 @@
 *.out
 *.synctex.gz
 *.bmp
+./source/__pycache__/*
+*.pyc
+*.txt

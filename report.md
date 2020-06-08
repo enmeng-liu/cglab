@@ -1,11 +1,11 @@
-# 《计算机图形学》4月报告
+# 《计算机图形学》5月报告
 
-## 综述
+## 一、综述
 
 + 完成内容：
 + 开发环境：Ubuntu 18.04 Python 3.7.0
 
-## 算法介绍
+## 二、算法介绍
 
 ### 直线绘制
 
@@ -41,7 +41,7 @@
             p_k+2\Delta y & p_k<0\;(y_{k+1}=y_k)
             \end{cases}
   $$
-  + 决策参数初始值为$p=2\Delta y-\Delta x$。
+	+ 决策参数初始值为$p=2\Delta y-\Delta x$。
 
 + 实现
 
@@ -123,9 +123,109 @@ $$
 
 ### 曲线绘制
 
-#### Brezier曲线
+#### Bezier曲线
+
++ 原理
+
+    + 给定$n+1$个控制点，生成的曲线$b(t)$可以看成是一个质点的运动轨迹。时刻$t$的质点可以这样定位：在$n$条控制点前后连接得到的线段上都按照$t : 1-t$的比例划分取点并连接，得到$n-1$条新的线段。然后对这$n-1$条线段重复相同操作，直到得到一个点为止。这个点就是此时质点所在的位置，也就是$b(t)$的值。（如图所示，可能不动）
+
+        ![](/media/mengzelev/6630E0A030E07907/Users/Mengzelev/My Documents/学习资料/图形学/cg/cglab/report_images/Bézier_3_big.gif)
+
+    + 按照这个原理推算，可以发现$n$阶Bezier曲线的方程的系数其实就是$((1-t)+t)^n$的二项式展开。即
+        $$
+        b^n(t)=\sum\limits_{j=0}^{n}B_j^n(t)P_j=\sum\limits_{j=0}^{n}\binom{n}{j} (1-t)^jt^{n-j}P_i, \quad t\text{为参数}
+        $$
+        其中第$j$项的系数$B_j^n(t)$称为Bernstein多项式，即二项展开式的第$j$项。
+
+    + 根据$n+1$个控制点可以直接得到Bezier曲线的方程，按照某个精度采样得到一系列采样点后，用直线连接这些采样点就可以实现“化曲为直”，近似地显示该曲线
+
++ 实现
+
+    + 这部分代码不长，故直接贴代码解释
+
+      ```python
+      n = len(p_list)
+      # 计算n-1为底的二项式系数
+      comb = []
+      comb.append(1)
+      for i in range(0, n):
+      	comb.append(comb[i] / (i + 1) * (n - 1 - i))
+      # 计算Bezier曲线公式
+      step = 0.01 # 采样步长
+      u = 0
+      while u <= 1:
+      	x, y = 0.0, 0.0
+      	for i in range(0, n):
+      		x += comb[i] * math.pow(u, i) * math.pow(1-u, n-1-i) * p_list[i][0]
+      		y += comb[i] * math.pow(u, i) * math.pow(1-u, n-1-i) * p_list[i][1]
+      	points.append([round(x), round(y)])
+      	u = u + step
+      # 生成的点间用直线相连
+      for i in range(0, len(points)-1):
+      	result = result + draw_line(points[i:i+2], 'Bresenham')
+      ```
+
+  + 实现中遇到的困难及解决
+
+    + 一开始没有意识到需要将采样点前后用直线相连，只生成了采样点，导致曲线比较长时需要采样非常多的点才能使曲线不断裂，而这样必然会导致计算非常慢。经高人提醒才想到可以“化曲为直”，用直线去近似曲线。
+    + PPT这一部分写得实在太不清楚了。公式和文字堆得有些杂乱，没有把Bezier曲线的几何直观和内涵解释出来，让读者根本摸不着头脑。我是通过[闫令琪老师的网课](https://www.bilibili.com/video/BV1X7411F744?t=3198&p=11)才恍然大悟的，希望这一部分的内容能有所修改。
 
 #### 三次B样条曲线
+
++ 原理：
+
+  + 为了解决Bezier曲线“牵一发动全身”的问题，提出用分段低阶多项式（样条）代替高次多项式的想法
+
+  + 不知道怎么拍脑袋想出来的一个基函数$N_{i,k}(t)$（第$i$个$k$阶B样条函数）
+    $$
+    P(t)=\sum\limits_{i=0}^n P_iN_{i,k+1}(t), t\in[t_k, t_{n+1}]\\
+    N_{i,1}(t)=\begin{cases}
+    	1 & t_i<x<t_{i+1}\\
+    	0 & o.w.
+    \end{cases}\\
+    N_{i,k}(t)=\frac{t-t_1}{t_{i+k-1}}N_{i,k-1}(t)+\frac{t_{i+k}-t}{t_{i+k}-t_{i+1}}(t)N_{i+1,k-1}(t)
+    $$
+
+    + 其中，$t_i, i=0,1,2\ldots n+k$叫做节点向量，是非减实数序列。基函数由这些节点向量唯一确定。
+    + $N_{i,k}(t)$的非零区间只有$[t_i, t_{i+k}]$，所以当一个控制点位置变化时，整个曲线不会都随之改变
+    + 给定$n$个控制点，绘制$k$阶（$k-1$次）B样条曲线需要$t_0$~$t_{n+k}$共$n+k+1$个节点
+    + 插值得到的曲线非零的区间为$[t_{k-1}, t_{n+1}]$
+    + $k$阶的含义为：每一段上必须有$k$个基函数插值组成；每个奇函数必须横跨$k$段区间
+    + 基函数有非负性和归一性（$\sum\limits_{i=0}^nN_{i,k}(t)=1, t\in[t_{k-1}, t_{n+1}]$）
+
+  + 上面这个玩意儿看着就很难算，所以de Boor搞出了一个算法，专门用来计算$P(t)$的系数。
+    $$
+    \begin{align*}
+    P(t)&=\sum\limits_{i=0}^n P_iN_{i,k+1}(t)\\
+    &=\sum\limits_{i=j-k+1}^{j}P_iN_{i,k}(t)\\
+    &=\sum\limits_{i=j-k+1}^{k}P_i\left[\frac{t-t_1}{t_{i+k-1}}N_{i,k-1}(t)+\frac{t_{i+k}-t}{t_{i+k}-t_{i+1}}(t)N_{i+1,k-1}(t)\right]\\
+    &=\sum\limits_{i=j-k+1}^{k}\left[\frac{t-t_i}{t_{i+k-1}-t_i}P_i+\frac{t_{i+k-1}-t}{t_{i+k-1}-t_i}P_{i-1}\right]N_{i,k-1}(t), \quad t\in [t_j, t_{j+1})
+    \end{align*}
+    $$
+  	+ 上式提供了一种将$k$阶B样条方程表示为$k-1$阶B样条方程的方法，将括号里关于$P_i$和$P_{i-1}$的式子看成一个新的点的坐标，就可以得到：
+      $$
+      P_i^r(t)=\begin{cases}
+      P_i & r=0,\; i=j-k+1, j-k+2,\ldots,j\\
+      \frac{t-t_i}{t_{i+k-1}-t_i}P_i^{r-1}+\frac{t_{i+k-1}-t}{t_{i+k-1}-t_i}P_{i-1}^{r-1} & r=1,2,\ldots k-1,\; i=j-k+r+1, j-k+r+2\ldots j
+      \end{cases}
+      $$
+    
+	+ 由于基函数具有归一性，曲线方程可以表示为
+	  $$
+	  P(t)=P_i^{k-1}(t)
+	  $$
+	
+	+ 每一项的系数都可以递归计算得到，从而得到曲线方程。采样+化曲为直就可以绘制出近似的曲线。
+	
++ 实现
+
+  + 这一部分的实现略有复杂。由于不允许使用numpy库，因此不能使用数组进行迭代计算，Python原生的list实现起来非常不方便。因此只能牺牲时间与空间递归计算每一项的系数。
+  + 说是计算系数，实际上是给定`r ,i, t`，计算$P(t)$的值，得到一系列采样点。
+
++ 遇到的问题及解决
+
+  + ppt上这一块还是不太清楚，我找了很多参考资料好不容易才弄明白的。
+  + 非常难写。所有算法难度天花板。
 
 ### 平移变换
 
@@ -153,15 +253,35 @@ $$
           \end{bmatrix}
     $$
     
-  + 当旋转中心非坐标原点时，可以暂时以旋转中心$(x_r,y_r)$为原点建立临时坐标系，再讲旋转后的图形坐标变换回到原坐标系中即可，即
+  + 当旋转中心非坐标原点时，可以暂时以旋转中心$(x_r,y_r)$为原点建立临时坐标系，再将旋转后的图形坐标变换回到原坐标系中即可，即
 $$
 \begin{cases}
       x_1=x_r+(x-x_r)\cos\theta-(y-y_r)\sin\theta\\
       y_1=y_r+(x-x_r)\sin\theta+(y-y_r)\cos\theta
     \end{cases}
 $$
++ 实现
+  + 直接按照公式实现，没有什么技巧
 
 ### 缩放变换
+
++ 原理
+
+  + 与旋转类似，因为相对于原点的缩放比较简单直观，所以先将图形平移，使缩放中心为原点，进行相对于原点的缩放，然后平移回到原来的位置。
+
+  + 相对于原点的缩放：
+
+    + 将每个顶点坐标$(x,y)$乘上缩放系数$(s_x, s_y)$，产生变换后的坐标$x_1=x\cdots s_x, y_1=y\cdot s_y$, 矩阵形式为$P_1=S\cdot P, S=\left[\begin{matrix}s_x & 0\\ x & s_y \end{matrix}\right]$
+
+  + 以$(x_f, y_f)$为固定点缩放后的坐标为
+      $$
+      x_1=x\cdot s_x+x_f(1-s_x)\\
+      y_1=y\cdot y_x+y_f(1-s_y)
+      $$
+
++ 实现
+
+  + 直接按照公式实现，没有什么技巧
 
 ### 线段裁剪
 
@@ -273,8 +393,209 @@ $$
 
   + 与Cohen-Sutherland算法相比计算量更小：更新参数范围总共只需做4次除法，裁剪后的直线段点坐标计算只包含加法与乘法
 
-## 参考资料
+## 三、命令行界面
+
+命令行界面的设计直接沿用了demo中给出的：
+
++ 分析输入命令，提取出为“命令”、“图元id”、“几何参数”、“算法”等部分。
++  根据命令的第一个单词，执行不同的操作。
+  + 绘制类命令（`drawLine,  drawPolygon, drawEllipse, drawCurve`）：将几何参数由`str`转换为`int`类型，和算法、当前画笔颜色组成list一起存入`item_dict `中以图元id为`key`的`value`中。
+  + 操作类命令（`translate, rotate, scale, clip`）：从`item_dict`中取出图元id对应的`value`，将该图元的几何参数作为参数调用`cg_algorithms`模块中实现的相应的操作函数。将得到的操作后的集合参数重新存入`item_dict`中。
+  + 控制类命令
+    + `resetCanvas`：清空`item_dict`中所有项，重新设置`width`和`height`的值。
+    + `saveCanvas`：创建一个初始化为白色（255）的`canvas`数组，遍历`item_dict`中每一个图元，调用`cg_algorithms`中实现的相应的绘制函数，得到需要绘制的点组成的list。把这些点用记录的画笔颜色填充。遍历完后将canvas数组保存至指定路径的bmp文件中。
+    + `set_color`：修改变量`pen_color`为指定的rgb值
+
+如下所示的指令文件输入可以得到下图
+
+```
+resetCanvas 1000 1000
+setColor 231 117 25
+drawLine l1 100 100 300 300 Bresenham
+drawLine l2 300 300 700 300 Bresenham
+drawLine l3 700 300 900 100 Bresenham
+setColor 255 0 255
+drawCurve c1 100 100 300 300 700 300 900 100 B-spline
+setColor 76 231 162
+drawEllipse e1 200 200 700 800
+setColor 64 52 113
+drawPolygon 500 500 600 400 700 400 800 500 700 600 600 600 Bresenham
+saveCanvas 1
+```
+
+<img src="/media/mengzelev/6630E0A030E07907/Users/Mengzelev/My Documents/学习资料/图形学/cg/cglab/report_images/cli_demo.bmp" style="zoom:30%;" />
+
+## 四、用户交互界面
+
+沿用了给出的demo中的基本框架。CG_demo给出的基本框架有3个类，其基本职责如下：
+
++ `MyCanvas(QGraphicsView)`：画布类
+  + 响应鼠标事件
+  + 从`MainWindow`接收参数（图元类型、id等），随鼠标的移动创建图元，并在鼠标松开时将创建的图元加入`self.item_dict`
+  + 维护`list_widget`，实现图元选择（待改进为鼠标单击
++ `MyItem(QGraphicsItem)`：图元类
+  + 绘制图元到画布上（`paint`）
+  + 为图元显示外接矩形
++ `MainWindow(QMainWindow)`：主窗口类
+  + 初始化界面：元素布局、菜单栏、连接信号和槽
+  + 一系列文件操作、设置、绘制、调整动作的方法实现
+
+下面针对每个功能进行简单的操作和实现说明。
+
+### 重置画布
+
++ 操作
+  + 菜单栏中“文件->重置画布”，先后弹出两个带输入的对话框，分别键入新画布的宽度和高度（必须满足在$[100,1000]$范围内）
+  + 点击`ok`后原画布会清空，生成指定尺寸的新空白画布
++ 实现（`MainWindow`中的`reset_canvas_action()`方法）
+  + 首先调用`clear_canvas_action()`清空画布
+  + 使用`QInputDialog`产生带输入条的对话框。当输入不符合要求时同样的对话框会再次出现，直到符合要求且选择`ok`后才会退出循环。
+  + 删除原来的`scene, canvas_widge, hbox_layout, list_widget`等组件，按照输入的宽度和高度调用`set_canvas_action`生成新的布局
+
+### 清空画布（新增）
+
++ 操作
+  + 菜单栏中“文件->清空画布”
++ 实现
+  + 对`canvas_widget`调用`resetCachedContent()`
+  + 清空`list_widget`中所有的项，`item_cnt`清零
+
+### 保存画布
+
++ 操作
+  + 菜单栏中“文件->保存画布”
+  + 弹出目录选择的对话框，选择需要保存到的目录，并输入文件名。（注：只能保存为bmp格式的文件）
+  + 选择`ok`后当前画布就会以bmp格式的图片出现在目标目录中
++ 实现
+  + 使用`QFileDialog`模块，产生一个目录选择的对话框并从中获得目标路径
+  + 使用`canvas_widget`的`grab`方法，将当前画布中的内容写到`QPixmap`类型的变量中，最后将`QPixmap`的内容保存在目标文件中	
+
+### 设置画笔颜色
+
++ 操作
+  + 菜单栏中“文件->设置画笔”
+  + 弹出选择颜色的对话框，选择需要的颜色即可
++ 实现
+  + 在`MainWindow`中使用`QColorDialog`模块，产生一个颜色选择的对话框并从中获得选择的颜色（`QColor`类型）
+  + `MyCanvas`新增属性`temp_pen_color`，并在`MainWindow`中将`canvas_widget.temp_pen_color`设置为指定值
+  + `MyItem`新增属性`color`，当`MyCanvas`创建`MyItem`时将自己的`self.temp_pen_color`传入
+
+### 绘制线段
+
++ 操作
+  + 菜单栏中“绘制->线段->[相应算法]”
+  + 在起点处单击，拖动直到终点松开
+  + 绘制的线段会出现在画布上，同时“序号+线段”会显示在旁边的列表中
++ 实现
+  + 沿用了demo中给出的实现
+  + 菜单栏中的绘制线段唤醒槽函数`main_window.canvas_widget.start_draw_line()`
+  + `MyCanvas`设置当前的`status, temp_algorithm, temp_id`
+  + `MyCanvas`覆盖父类的`mousePressEvent()`，当鼠标按下时构造起点-起点的直线（点）的`MyItem`并加入`self.scene()`中
+  + `MyCanvas`覆盖父类的`mouseMoveEvent()`，实时修改直线的终点，制造出直线随着鼠标移动的效果
+  + `MyCanvas`覆盖父类的`mouseReleaseEvent()`，当鼠标松开时，把刚的直线加入`self.item_dict`中
+
+### 绘制多边形
+
++ 操作
+  + 菜单栏中“绘制->多边形->[相应算法]”
+  + 起点处单击，像绘制直线一样绘制第一条边
+  + 之后每单击一次，都会在上一个顶点和单击处连接生成一条边
+  + 在需要终止的时候双击，自动生成当前点到起点的边使多边形闭合
++ 实现
+  + 类似绘制线段的实现，唯一不同的在于终止事件的处理
+  + 多边形闭合前每次增加节点都绘制直线，暂时在`self.item_dict[item_id]`保存所有直线对象
+  + 双击后删去之前绘制的直线，将经过的每个点作为多边形的顶点构造多边形，加入`self.scene()`和`self.item_dict`
+
+### 绘制椭圆
+
++ 操作和实现与绘制直线基本相同，不做赘述
+
+### 绘制曲线
+
++ 操作
+  + “绘制->曲线->[相应算法]”
+  + 逐个点击控制点位置，控制点会显示在屏幕上鼠标点击处，曲线同步绘制（B样条曲线在少于4个控制点时不会绘制）
+  + 双击结束绘制
++ 实现
+  + 在`MyItem()`中新增方法`display_control_points()`，用于显示曲线的控制点
+  + 每次点击时将鼠标的坐标加入曲线的`p_list`中并更新屏幕
+
+### 选择图元
+
++ 操作
+  + 单击图元本身或单击列表中的图元项
+  + 单击空白处取消选中
++ 实现
+  + 单击列表项选中图元沿用demo中设计
+  + 单击选择图元时使用了`QGraphicsView`的`items()`方法，可以返回此时鼠标单击位置上的一系列图元。将最顶上的图元的状态置为选中即可。
+
+### 平移图元
+
++ 操作
+  + 单击或通过列表选中图元
+  + “编辑->平移”
+  + 拖动鼠标，图元会平移与鼠标拖动相同的距离
+  + 松开鼠标时完成本次平移，之后仍可以继续平移图元，直到单击空白处取消选中图形为止
++ 实现
+  + 按下鼠标时记录当前鼠标的位置在`MyCanvas.mouse_pos`中，随着鼠标拖动不断更新`MyCanvas.mouse_pos`，并调用alg模块中的`translate()`算法将当前选中图元平移鼠标拖动的距离
+  + 鼠标不一定要落在图元的外接矩形内，平移的始终是鼠标移动的相对距离
+  + 注意：在`MouseMoveEvent`中要时刻更新`mouse_pos`，不然就会发生<s>育碧</s>光速平移现象
+
+### 裁剪线段
+
++ 操作
+  + 选中图元，“编辑->裁剪->[相应算法]”
+  + 按下并拖动鼠标，绘制作为裁剪窗口的矩形框
+  + 松开鼠标时线段完成裁剪
++ 实现
+  + 在`MyCanvas`中维护属性`self.aux_rect`，用于显示裁剪窗口。
+  + 类似直线和绘制，随着鼠标拖动绘制裁剪窗口对应的矩形。
+  + 松开鼠标时调用`alg.clip()`算法对选中线段进行裁剪，若线段整个位于裁剪框之外就删去该线段。
+
+### 旋转图元
+
++ 操作
+  + 选中图元，“编辑->旋转”
+  + 此时会出现一个旋转中心，默认出现在图形中心位置
+  + 鼠标可以点击拖动旋转中心
+  + 图元外接矩形的四角可以作为旋转开始点，在小矩形内单击开始旋转，图形会跟随鼠标运动转过相同的角度
++ 实现
+  + 在`MyItem`中实现`display_rotate_center()`，用于显示图元的旋转中心
+  + 如果鼠标点击位置位于旋转中心小矩形内，就变为移动旋转中心的状态，旋转中心跟随鼠标移动；如果鼠标点击位置位于外接矩形四角内，就变为旋转图元状态，图元跟随鼠标移动而转动；落在图元外接矩形之外则取消选中。
+  + 旋转的角度通过余弦定理计算得到；是顺时针还是逆时针旋转通过计算向量叉积的第三分量符号确定
+  + 如果和平移一样每次相对于鼠标上个位置进行旋转会产生累计误差，导致多边形变形。需要保存鼠标按下前的坐标，之后每次旋转变换都以保存的第一个位置为基准计算坐标。
+
+
+### 缩放图元
+
++ 操作
+  + 选中图元，“编辑->缩放”
+  + 图元的boundingRect四角会出现边长为12像素的正方形缩放框，鼠标单击选中某个缩放框并拖动，图元就会以单击顶点的对角顶点为中心进行缩放
++ 实现
+  + 在`MyItem`中实现`displatscale_vertex()`方法，用于在外界矩形四角绘制小缩放框。当图元被选中且进入待缩放状态时就调用该方法。
+  + 在`MyCanvas`中追踪鼠标的移动。鼠标单击时讲此时鼠标的位置信息传给`MyItem`，由后者决定此时的缩放中心，并保存在`MyItem`的`self.center`属性中。鼠标移动时也将鼠标的位置信息传递给`MyItem`，由其计算出缩放的倍数$s=\frac{x_{new}-x_{center}}{x_{old}-x_{center}}$并调用算法模块的`scale()`方法完成缩放。
+  + 缩放图元也会产生累计误差的问题，解决方法同旋转图元一节的叙述
+
+
+
+### 删除图元（新增）
+
++ 操作
+  + 选中图元
+  + “编辑->删除”
+  + 图元会从画布和列表上消失
++ 实现
+  + 都是对API的调用，没有什么特别的地方
+
+## 五、参考资料
 
 + [B样条曲线——de Boor递推算法实现](https://blog.csdn.net/Hachi_Lin/article/details/89812126)
 + [n 阶贝塞尔曲线计算公式实现](https://blog.csdn.net/aimeimeits/article/details/72809382)
 + [Cohen-Sutherland](https://en.wikipedia.org/wiki/Cohen%E2%80%93Sutherland_algorithm)
++ [GAMES101-现代计算机图形学入门-闫令琪](https://www.bilibili.com/video/BV1X7411F744?t=3198&p=11)
++ [清华大学-计算机图形学基础（国家级精品课）](https://www.bilibili.com/video/BV13441127CH?t=799&p=14)
++ [PyQt5中文教程](https://maicss.gitbooks.io/pyqt5/content/%E6%8E%A7%E4%BB%B61.html)
++ [How to create image file from QGraphicsScene/QGraphicsView?](https://stackoverflow.com/questions/7451183/how-to-create-image-file-from-qgraphicsscene-qgraphicsview)
++ [PySide2.QtWidgets](https://doc.qt.io/qtforpython/PySide2/QtWidgets/index.html#module-PySide2.QtWidgets)
++ [Qt Documentation-All Classes](https://doc.qt.io/qt-5/classes.html)
++ [Qt QGraphics 实现可移动缩放的矩形框](https://blog.csdn.net/ShareProgress/article/details/101287935)
