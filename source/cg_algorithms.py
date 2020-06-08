@@ -399,4 +399,3 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
     else:
         print('Invalid algorithm: ' + algorithm)
     return result
-
