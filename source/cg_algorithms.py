@@ -15,8 +15,8 @@ def draw_line(p_list, algorithm):
     :return: (list of list of int: [[x_0, y_0], [x_1, y_1], [x_2, y_2], ...]) 绘制结果的像素点坐标列表
     """
     # logging.debug('draw line for {} with {}'.format(p_list, algorithm))
-    x0, y0 = p_list[0]
-    x1, y1 = p_list[1]
+    x0, y0 = round(p_list[0][0]), round(p_list[0][1])
+    x1, y1 = round(p_list[1][0]), round(p_list[1][1])
     result = []
     if x1 == x0:
         result = [[x0, y] for y in range(min(y0, y1), max(y0, y1) + 1)]
@@ -398,4 +398,92 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
         return result
     else:
         print('Invalid algorithm: ' + algorithm)
+    return result
+
+
+def polygon_is_counterclockwise(p_list):
+    n = len(p_list)-1
+    if n < 3:
+        return False
+    s = p_list[0][1] * (p_list[n-1][0] - p_list[1][0])
+    for i in range(1, n):
+        s += p_list[i][1] * (p_list[i-1][0] - p_list[i+1][0])
+    return bool(s > 0)
+
+
+def polygon_clip(p_list, x_min, y_min, x_max, y_max):
+    n = len(p_list)
+    p_list.append(p_list[0])
+    if not polygon_is_counterclockwise(p_list):
+        p_list = p_list[::-1]
+    result = []
+    for i in range(0, n):
+        x_i, y_i = p_list[i]
+        delta_x = p_list[i+1][0] - x_i
+        delta_y = p_list[i+1][1] - y_i
+        if delta_x > 0:
+            x_in, x_out = x_min, x_max
+        else:
+            x_in, x_out = x_max, x_min
+        if delta_y > 0:
+            y_in, y_out = y_min, y_max
+        else:
+            y_in, y_out = y_max, y_min
+
+        if delta_x != 0:
+            t_in_x = (x_in - x_i) / delta_x
+        else:
+            t_in_x = float('-inf')
+        if delta_y != 0:
+            t_in_y = (y_in - y_i) / delta_y
+        else:
+            t_in_y = float('-inf')
+
+        if t_in_x < t_in_y:
+            t_in_1, t_in_2 = t_in_x, t_in_y
+        else:
+            t_in_1, t_in_2 = t_in_y, t_in_x
+
+        if 1 >= t_in_1:  # case 2,3,4,6
+            if 0 < t_in_1: # case5 turning vetex
+                result.append([x_in, y_in])
+            if 1 >= t_in_2:  # case 3,4,6
+                if delta_x != 0:
+                    t_out_x = (x_out - x_i) / delta_x
+                else: # vertical
+                    if x_min <= x_i <= x_max:  # inside
+                        t_out_x = float('inf')
+                    else:  # outside
+                        t_out_x = float('-inf')
+                if delta_y != 0:
+                    t_out_y = (y_out - y_i) / delta_y
+                else:  # horizontal
+                    if y_min <= y_i <= y_max:  # inside
+                        t_out_y = float('inf')
+                    else:  # outside
+                        t_out_y = float('-inf')
+                if t_out_x < t_out_y:  # first exit at x
+                    t_out_1 = t_out_x
+                else: # first exit at y
+                    t_out_1 = t_out_y
+                if 0 < t_in_2 or 0 < t_out_1: # case 4,6
+                    if t_in_2 <= t_out_1: # case 4 visible segment
+                        if 0 < t_in_2: # p[i] outside window
+                            if t_in_x > t_in_y: # vertival boundary
+                                result.append([x_in, y_i + t_in_x * delta_y])
+                            else: # horizontal boundary
+                                result.append([x_i+t_in_y*delta_x, y_in])
+                        if 1 > t_out_1:  # p[i+1] outside window
+                            if t_out_x < t_out_y:
+                                result.append([x_out, y_i+t_out_x*delta_y])
+                            else:
+                                result.append([x_i+t_out_y*delta_x, y_out])
+                        else: # p[i+1] inside window
+                            result.append(p_list[i+1])
+                    else: # case 6: turning vertex
+                        if t_in_x > t_in_y:  # second entry at x
+                            result.append([x_in, y_out])
+                        else:  # second entry at y
+                            result.append([x_out, y_in])
+        # print('append (%d, %d)' % (result[-1][0], result[-1][1]))
     return result

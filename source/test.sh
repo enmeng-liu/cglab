@@ -1,2 +1,2 @@
 #!/bin/zsh
-python cg_cli.py mytest.txt .
+python cg_cli.py ../test/test.txt .

@@ -31,8 +31,8 @@ if __name__ == '__main__':
         while line:
             line = line.strip().split(' ')
             if line[0][0] == '#':
-                pass #注释
-            if line[0] == 'resetCanvas':
+                pass
+            elif line[0] == 'resetCanvas':
                 width = int(line[1])
                 height = int(line[2])
                 item_dict = {}
@@ -43,6 +43,7 @@ if __name__ == '__main__':
                 for item_type, p_list, algorithm, color in item_dict.values():
                     pixels = draw_dict[item_type](p_list, algorithm)
                     for x,y in pixels:
+                        x, y = round(x), round(y)
                         canvas[height - 1 - y, x] = color
                 Image.fromarray(canvas).save(os.path.join(output_dir, save_name + '.bmp'), 'bmp')
             elif line[0] == 'setColor':
@@ -99,6 +100,16 @@ if __name__ == '__main__':
                 if item_type != 'line':
                     print('Cannot clip {} type'.format(item_type))
                 p_list = alg.clip(p_list, int(line[2]), int(line[3]), int(line[4]), int(line[5]), line[6])
+                if len(p_list):
+                    item_dict[item_id] = item_type, p_list, algorithm, color
+                else:
+                    del item_dict[item_id]
+            elif line[0] == 'clipPolygon':
+                item_id = line[1]
+                item_type, p_list, algorithm, color = item_dict[item_id]
+                if item_type != 'polygon':
+                    print('Wrong shape type.')
+                p_list = alg.polygon_clip(p_list, int(line[2]), int(line[3]), int(line[4]), int(line[5]))
                 if len(p_list):
                     item_dict[item_id] = item_type, p_list, algorithm, color
                 else:
