@@ -336,8 +336,10 @@ def clip(p_list, x_min, y_min, x_max, y_max, algorithm):
     result = []
     [x0, y0], [x1, y1] = p_list
     # logging.debug('Start to clip {} with ({},{}) to ({},{})'.format(p_list, x_min, y_min, x_max, y_max))
-    if x_min > x_max or y_min > y_max:
-        return p_list
+    if x_min > x_max:
+        x_min, x_max = x_max, x_min
+    if y_min > y_max:
+        y_min, y_max = y_max, y_min
     if algorithm == 'Cohen-Sutherland':
         oc0 = outcode(x0, y0, x_min, y_min, x_max, y_max)
         oc1 = outcode(x1, y1, x_min, y_min, x_max, y_max)

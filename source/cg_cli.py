@@ -10,7 +10,7 @@ from PIL import Image
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level = logging.WARNING)
+    logging.basicConfig(level=logging.WARNING)
     input_file = sys.argv[1]
     output_dir = sys.argv[2]
     os.makedirs(output_dir, exist_ok=True)
@@ -30,7 +30,10 @@ if __name__ == '__main__':
         line = fp.readline()
         while line:
             line = line.strip().split(' ')
-            if line[0][0] == '#':
+            logging.debug('len line=%d', len(line))
+            if len(line) == 0 or len(line[0]) == 0:
+                continue
+            elif line[0][0] == '#':
                 pass
             elif line[0] == 'resetCanvas':
                 width = int(line[1])
