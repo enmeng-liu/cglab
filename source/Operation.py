@@ -1,11 +1,12 @@
-from MyCanvas import MyCanvas
+import logging
+from copy import deepcopy
+
 from MyItem import MyItem
 
 
 class Operation:
-    def __init__(self, item: MyItem, canvas: MyCanvas):
+    def __init__(self, item: MyItem):
         self.item = item
-        self.canvas = canvas
 
     def mouse_move(self):
         pass
@@ -19,7 +20,7 @@ class Operation:
     def finish(self):
         pass
 
-    def restore(self):
+    def undo(self):
         """
         撤销该步操作
         """
@@ -27,15 +28,65 @@ class Operation:
 
 
 class DrawItem(Operation):
-    def restore(self):
-        item_to_delete = self.item
-        del self.canvas.item_dict[item_to_delete.id]
-        if self.canvas.selected_id == item_to_delete.id:
-            self.canvas.selected_id = ''
-            self.canvas.main_window.list_widget.setCurrentItem(None)
-        if self.canvas.temp_item == item_to_delete:
-            self.canvas.temp_item = None
-        self.canvas.scene().removeItem(item_to_delete)
-        self.canvas.updateScene([self.canvas.sceneRect()])
-        self.canvas.main_window.list_widget.takeItem(self.canvas.main_window.list_widget.row(item_to_delete.list_item))
-        self.canvas.status = 'deleted'
+    def __str__(self):
+        return 'DrawItem: %s' % self.item
+
+    def undo(self):
+        logging.debug('Undo and delete %s' % self.item)
+        return 'delete', self.item
+
+
+class EditItem(Operation):
+    def __init__(self, item: MyItem):
+        super().__init__(item)
+        self.old_p_list = deepcopy(item.p_list)
+
+    def __str__(self):
+        return 'EditItem old_p_list={}'.format(self.old_p_list)
+
+    def undo(self):
+        logging.debug('Undo {} to old p_list={}'.format(self.item, self.old_p_list))
+        self.item.p_list = self.old_p_list
+        return 'undo', self.item
+
+
+class MoveCenter(Operation):
+    def __init__(self, item):
+        super().__init__(item)
+        self.old_center = self.item.center
+
+    def __str__(self):
+        return 'MoveCenter old center={}'.format(self.old_center)
+
+    def undo(self):
+        logging.debug('Undo {} to old center={}'.format(self.item, self.old_center))
+        self.item.center = self.old_center
+        return 'undo', self.item
+
+
+class DeleteItem(Operation):
+    def __str__(self):
+        return 'DeleteItem %s' % self.item
+
+    def undo(self):
+        logging.debug('Undo and restore {}'.format(self.item))
+        return 'restore', self.item
+
+
+class DrawingPolygon(Operation):
+    def __str__(self):
+        return 'DrawingPolygon: %s' % self.item
+
+    def undo(self):
+        logging.debug('Undo drawing polygon line {}'.format(self.item))
+        return 'drawing_polygon', self.item
+
+
+class DrawingCurve(Operation):
+    def __str__(self):
+        return 'DrawingCurve: %s' % self.item
+
+    def undo(self):
+        self.item.p_list.pop()
+        logging.debug('Undo drawing curve.')
+        return 'undo', self.item

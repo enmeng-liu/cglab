@@ -1,5 +1,25 @@
 import collections
+import logging
+
 from MyItem import MyItem
+from Operation import DrawItem, EditItem, MoveCenter, DeleteItem, DrawingPolygon, DrawingCurve
+
+status_operation_map = {
+    'line': DrawItem,
+    'polygon': DrawItem,
+    'ellipse': DrawItem,
+    'curve': DrawItem,
+    'copy': DrawItem,
+    'translate': EditItem,
+    'scale': EditItem,
+    'rotate': EditItem,
+    'clip': EditItem,
+    'clip_polygon': EditItem,
+    'rotate_move_center': MoveCenter,
+    'delete': DeleteItem,
+    'drawing_polygon': DrawingPolygon,
+    'drawing_curve': DrawingCurve,
+}
 
 
 class OperationList:
@@ -9,20 +29,25 @@ class OperationList:
     def __init__(self):
         self.op_list = collections.deque()
 
-    def add_memo(self):
-        pass
+    def add_operation(self, status: str, item: MyItem):
+        try:
+            operation = status_operation_map[status](item)
+        except KeyError:
+            logging.error('No such operation.')
+            return
+        self.op_list.append(operation)
+        logging.debug('add operation: %s' % operation)
 
-    def add_draw_memo(self, item: MyItem):
-        pass
+    def undo(self):
+        if len(self.op_list) == 0:
+            raise ValueError('empty op_list')
+        last_operation = self.op_list.pop()
 
-    def add_translate_memo(self, item_id, deltax, deltay):
-        pass
+        # 曲线和多边形特殊处理
+        if isinstance(last_operation, DrawItem):
+            while self.op_list and isinstance(self.op_list[-1], DrawingCurve):
+                self.op_list.pop()
+            while self.op_list and isinstance(self.op_list[-1], DrawingPolygon):
+                self.op_list.pop()
 
-    def add_rotate_memo(self, item_id, radian):
-        pass
-
-    def add_scale_memo(self, s):
-        pass
-
-    def restore(self):
-        pass
+        return last_operation.undo()
